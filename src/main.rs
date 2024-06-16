@@ -1,20 +1,35 @@
 #![no_std]
 #![no_main]
+#![feature(type_alias_impl_trait)]
 
+use embassy_executor::Spawner;
+use embassy_net::{Stack, StackResources};
+use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl, delay::Delay, peripherals::Peripherals, prelude::*, system::SystemControl,
+    timer::timg::TimerGroup,
 };
+use esp_println::{logger::init_logger, println};
+use esp_wifi::wifi::WifiStaDevice;
+use static_cell::make_static;
+use wifi::{connection, get_ip_addr, net_task};
 
-#[entry]
-fn main() -> ! {
+mod bus;
+mod wifi;
+
+#[main]
+async fn main(spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
+
+    log::info!("starting");
+
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
-
     let clocks = ClockControl::max(system.clock_control).freeze();
-    let delay = Delay::new(&clocks);
 
-    esp_println::logger::init_logger_from_env();
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
+    esp_hal_embassy::init(&clocks, timg0);
 
     let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let _init = esp_wifi::initialize(
@@ -26,9 +41,26 @@ fn main() -> ! {
     )
     .unwrap();
 
+    let wifi = peripherals.WIFI;
+    let (wifi_interface, controller) =
+        esp_wifi::wifi::new_with_mode(&_init, wifi, WifiStaDevice).unwrap();
+    let config = embassy_net::Config::dhcpv4(Default::default());
+    let seed = 1234; // very random, very secure seed
+
+    // Init network stack
+    let stack = &*make_static!(Stack::new(
+        wifi_interface,
+        config,
+        make_static!(StackResources::<3>::new()),
+        seed
+    ));
+
+    spawner.spawn(connection(controller)).ok();
+    spawner.spawn(net_task(&stack)).ok();
+    spawner.spawn(get_ip_addr(&stack)).ok();
+
     loop {
         log::info!("Hello world!");
-        delay.delay(500.millis());
+        Timer::after(Duration::from_millis(5_000)).await;
     }
 }
- 
