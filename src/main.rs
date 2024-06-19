@@ -2,20 +2,22 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use core::mem::MaybeUninit;
 use embassy_executor::Spawner;
 use embassy_net::{Stack, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl, delay::Delay, peripherals::Peripherals, prelude::*, system::SystemControl,
+    clock::ClockControl, peripherals::Peripherals, prelude::*, system::SystemControl,
     timer::timg::TimerGroup,
 };
-use esp_println::{logger::init_logger, println};
 use esp_wifi::wifi::WifiStaDevice;
+use mqtt::{mqtt_task};
 use static_cell::make_static;
 use wifi::{connection, get_ip_addr, net_task};
 
 mod bus;
+mod mqtt;
 mod wifi;
 
 #[main]
@@ -59,8 +61,10 @@ async fn main(spawner: Spawner) {
     spawner.spawn(net_task(&stack)).ok();
     spawner.spawn(get_ip_addr(&stack)).ok();
 
+    spawner.spawn(mqtt_task(&stack)).ok();
+
     loop {
-        log::info!("Hello world!");
+        // log::info!("Hello world!");
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }

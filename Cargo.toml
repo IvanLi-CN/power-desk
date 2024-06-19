@@ -21,7 +21,7 @@ esp-hal-embassy = { version = "0.1.0", features = [
 esp-println = { version = "0.9.1", features = ["esp32c3", "log"] }
 log = { version = "0.4.21" }
 
-embedded-svc = { version = "0.26.1", default-features = false, features = [] }
+embedded-svc = { version = "0.27.1", default-features = false, features = [] }
 embedded-io = "0.6.1"
 
 esp-wifi = { version = "0.6.0", features = [
@@ -32,23 +32,12 @@ esp-wifi = { version = "0.6.0", features = [
     "embassy-net",
 ] }
 heapless = { version = "0.8.0", default-features = false }
-smoltcp = { version = "0.11.0", default-features = false, features = [
-    "medium-ethernet",
-    "proto-dhcpv4",
-    "proto-igmp",
-    "proto-ipv4",
-    "socket-dhcpv4",
-    "socket-icmp",
-    "socket-raw",
-    "socket-tcp",
-    "socket-udp",
-] }
 
 embassy-executor = { version = "0.5.0", features = ["nightly"] }
-embassy-time = { version = "0.3.0", features = [] }
+embassy-time = { version = "0.3.1", features = [] }
 embassy-net = { version = "0.4.0", features = [
     "dhcpv4",
-    "udp",
+    "tcp",
     "dns",
     "medium-ethernet",
 ] }
@@ -57,8 +46,9 @@ embassy-sync = "0.5.0"
 
 static_cell = { version = "2.1.0", features = ["nightly"] }
 rust-mqtt = { version = "0.3.0", default-features = false, features = [
-    "no_std",
+    "log"
 ] }
+embassy-futures = "0.1.1"
 [profile.dev]
 # Rust debug is too slow.
 # For debug builds always builds with some optimization
