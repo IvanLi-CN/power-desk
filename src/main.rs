@@ -2,7 +2,6 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use core::mem::MaybeUninit;
 use embassy_executor::Spawner;
 use embassy_net::{Stack, StackResources};
 use embassy_time::{Duration, Timer};
@@ -12,7 +11,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_wifi::wifi::WifiStaDevice;
-use mqtt::{mqtt_task};
+use mqtt::mqtt_task;
 use static_cell::make_static;
 use wifi::{connection, get_ip_addr, net_task};
 
