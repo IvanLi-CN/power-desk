@@ -7,8 +7,7 @@ use embassy_net::{Stack, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl, peripherals::Peripherals, prelude::*, system::SystemControl,
-    timer::timg::TimerGroup,
+    clock::ClockControl, gpio::{Io, Output}, i2c::I2C, peripherals::{Peripherals, GPIO}, prelude::*, system::SystemControl, timer::timg::TimerGroup
 };
 use esp_wifi::wifi::WifiStaDevice;
 use mqtt::mqtt_task;
@@ -18,6 +17,7 @@ use wifi::{connection, get_ip_addr, net_task};
 mod bus;
 mod mqtt;
 mod wifi;
+mod temperature;
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -56,14 +56,31 @@ async fn main(spawner: Spawner) {
         seed
     ));
 
+
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    // Init I2C driver
+    let i2c = I2C::new_async(
+        peripherals.I2C0,
+        io.pins.gpio4,
+        io.pins.gpio5,
+        100u32.kHz(),
+        &clocks,
+    );
+    let i2c = make_static!(i2c);
+
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(&stack)).ok();
     spawner.spawn(get_ip_addr(&stack)).ok();
 
     spawner.spawn(mqtt_task(&stack)).ok();
 
+    spawner.spawn(temperature::task(i2c)).ok();
+
     loop {
         // log::info!("Hello world!");
         Timer::after(Duration::from_millis(5_000)).await;
+
+
     }
 }
