@@ -22,4 +22,4 @@ impl Display for WiFiConnectStatus {
 pub static WIFI_CONNECT_STATUS: Mutex<CriticalSectionRawMutex, WiFiConnectStatus> =
     Mutex::new(WiFiConnectStatus::Connecting);
 
-pub static mut TEMPERATURE: Channel<NoopRawMutex, f32, 1> = Channel::<NoopRawMutex, f32, 1>::new();
+pub(crate) static TEMPERATURE_CH: Channel<CriticalSectionRawMutex, f32, 10> = Channel::new();

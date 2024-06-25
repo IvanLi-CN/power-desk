@@ -2,6 +2,8 @@ use embassy_time::Timer;
 use esp_hal::{i2c::I2C, peripherals::I2C0, Async};
 use gx21m15::{Gx21m15, Gx21m15Config, OsFailQueueSize};
 
+use crate::bus::TEMPERATURE_CH;
+
 const MAX_FAIL_TIMES: u8 = 3;
 
 #[embassy_executor::task]
@@ -47,6 +49,7 @@ pub async fn task(i2c: &'static mut I2C<'static, I2C0, Async>) {
 
             if let Ok(temp) = temp {
                 log::info!("Temperature: {}℃", temp);
+                TEMPERATURE_CH.send(temp).await;
             }
 
             Timer::after_millis(1000).await;
