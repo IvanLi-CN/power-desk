@@ -34,6 +34,30 @@ pub async fn task(i2c: &'static mut I2C<'static, I2C0, Async>) {
             }
         }
 
+        // configure over temperature protection
+        match sensor.set_temperature_hysteresis(50.0).await {
+            Ok(_) => {
+                let t = sensor.get_temperature_hysteresis().await;
+                log::info!("Temperature hysteresis: {:?}", t);
+            },
+            Err(err) => {
+                log::error!("Failed to set temperature hysteresis: {:?}", err);
+                Timer::after_millis(1000).await;
+                continue;
+            },
+        }
+        match sensor.set_temperature_over_shutdown(40.0).await {
+            Ok(_) => {
+                let t = sensor.get_temperature_over_shutdown().await;
+                log::info!("Temperature over shutdown: {:?}", t);
+            },
+            Err(err) => {
+                log::error!("Failed to set temperature over shutdown: {:?}", err);
+                Timer::after_millis(1000).await;
+                continue;
+            },
+        }
+
         loop {
             let temp = sensor.get_temperature().await;
 

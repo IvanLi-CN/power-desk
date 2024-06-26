@@ -7,7 +7,8 @@ use embassy_net::{Stack, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl, gpio::{Io, Output}, i2c::I2C, peripherals::{Peripherals, GPIO}, prelude::*, system::SystemControl, timer::timg::TimerGroup
+    clock::ClockControl, gpio::Io, i2c::I2C, peripherals::Peripherals, prelude::*,
+    system::SystemControl, timer::timg::TimerGroup,
 };
 use esp_wifi::wifi::WifiStaDevice;
 use mqtt::mqtt_task;
@@ -16,8 +17,8 @@ use wifi::{connection, get_ip_addr, net_task};
 
 mod bus;
 mod mqtt;
-mod wifi;
 mod temperature;
+mod wifi;
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -56,7 +57,6 @@ async fn main(spawner: Spawner) {
         seed
     ));
 
-
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Init I2C driver
@@ -80,7 +80,5 @@ async fn main(spawner: Spawner) {
     loop {
         // log::info!("Hello world!");
         Timer::after(Duration::from_millis(5_000)).await;
-
-
     }
 }
