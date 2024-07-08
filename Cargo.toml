@@ -42,15 +42,16 @@ embassy-net = { version = "0.4.0", features = [
     "medium-ethernet",
 ] }
 embassy-embedded-hal = "0.1.0"
-embassy-sync = "0.6.0"
+embassy-sync = "0.5.0"
 
 static_cell = { version = "2.1.0", features = ["nightly"] }
-rust-mqtt = { version = "0.3.0", default-features = false, features = [
-    "log"
-] }
+rust-mqtt = { version = "0.3.0", default-features = false, features = ["log"] }
 embassy-futures = "0.1.1"
+embedded-hal-async = { version = "1.0.0" }
+embedded-hal-bus = { version = "0.2.0", features = ["defmt-03", "async"] }
 
-gx21m15 = { path = "../gx21m15.rs", features = ["async"], version = "*"}
+gx21m15 = { path = "../gx21m15.rs", features = ["async"], version = "*" }
+ina226 = { features = ["async"], version = "0.3.0" }
 
 [profile.dev]
 # Rust debug is too slow.

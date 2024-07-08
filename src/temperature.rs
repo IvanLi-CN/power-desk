@@ -1,3 +1,5 @@
+use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_time::Timer;
 use esp_hal::{i2c::I2C, peripherals::I2C0, Async};
 use gx21m15::{Gx21m15, Gx21m15Config, OsFailQueueSize};
@@ -7,7 +9,7 @@ use crate::bus::TEMPERATURE_CH;
 const MAX_FAIL_TIMES: u8 = 3;
 
 #[embassy_executor::task]
-pub async fn task(i2c: &'static mut I2C<'static, I2C0, Async>) {
+pub async fn task(i2c: &'static mut I2cDevice<'static, CriticalSectionRawMutex ,I2C<'static, I2C0, Async>>) {
     let mut sensor = Gx21m15::new(i2c, 0x48);
 
     log::info!("run temperature sensor task...");

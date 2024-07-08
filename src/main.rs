@@ -2,13 +2,27 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use core::{borrow::Borrow, cell::RefCell};
+
+use charge_channel::ChargeChannel;
+use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_net::{Stack, StackResources};
+use embassy_sync::{
+    blocking_mutex::raw::{CriticalSectionRawMutex, RawMutex},
+    mutex::Mutex,
+};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl, gpio::Io, i2c::I2C, peripherals::Peripherals, prelude::*,
-    system::SystemControl, timer::timg::TimerGroup,
+    clock::ClockControl,
+    gpio::Io,
+    i2c::I2C,
+    peripherals::{Peripherals, I2C0},
+    prelude::*,
+    system::SystemControl,
+    timer::timg::TimerGroup,
+    Async,
 };
 use esp_wifi::wifi::WifiStaDevice;
 use mqtt::mqtt_task;
@@ -16,6 +30,7 @@ use static_cell::make_static;
 use wifi::{connection, get_ip_addr, net_task};
 
 mod bus;
+mod charge_channel;
 mod mqtt;
 mod temperature;
 mod wifi;
@@ -67,7 +82,13 @@ async fn main(spawner: Spawner) {
         100u32.kHz(),
         &clocks,
     );
-    let i2c = make_static!(i2c);
+
+    let i2c_mutex = make_static!(Mutex::<CriticalSectionRawMutex, _>::new(i2c));
+
+    let temperature_i2c_dev = I2cDevice::new(i2c_mutex);
+    let channel_i2c_dev = I2cDevice::new(i2c_mutex);
+    let temperature_i2c_dev = make_static!(temperature_i2c_dev);
+    let channel_i2c_dev = make_static!(channel_i2c_dev);
 
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(&stack)).ok();
@@ -75,7 +96,11 @@ async fn main(spawner: Spawner) {
 
     spawner.spawn(mqtt_task(&stack)).ok();
 
-    spawner.spawn(temperature::task(i2c)).ok();
+    spawner.spawn(temperature::task(temperature_i2c_dev)).ok();
+
+    spawner
+        .spawn(charge_channel::task(channel_i2c_dev))
+        .ok();
 
     loop {
         // log::info!("Hello world!");

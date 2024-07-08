@@ -1,4 +1,6 @@
-use embassy_futures::select::{select3, Either3};
+use core::future;
+
+use embassy_futures::select::{select, select3, Either3};
 use embassy_net::{tcp::TcpSocket, IpAddress, IpEndpoint, Stack};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker, Timer};
@@ -11,7 +13,7 @@ use rust_mqtt::{
 };
 use static_cell::make_static;
 
-use crate::bus::{WiFiConnectStatus, TEMPERATURE_CH, WIFI_CONNECT_STATUS};
+use crate::bus::{WiFiConnectStatus, CHARGE_CHANNELS, TEMPERATURE_CH, WIFI_CONNECT_STATUS};
 
 const MQTT_STATUS: Mutex<NoopRawMutex, MqttStatus> = Mutex::new(MqttStatus::Disconnected);
 
@@ -112,8 +114,8 @@ pub async fn mqtt_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>
                 Either3::Third((topic_name, message, qos, retain)) => {
                     match client.send_message(topic_name, &message, qos, retain).await {
                         Ok(_) => log::info!("Sent"),
-                        Err(_) => {
-                            log::error!("Send error");
+                        Err(err) => {
+                            log::error!("Send error: {:?}", err);
                             break;
                         }
                     }
@@ -140,15 +142,60 @@ pub async fn waiting_wifi_connected() {
 }
 
 pub async fn next_message(msg_buffer: &mut [u8]) -> (&str, &[u8], QualityOfService, bool) {
-    let temperature = TEMPERATURE_CH.receive().await;
+    let ch0 = select3(
+        CHARGE_CHANNELS[0].amps.receive(),
+        CHARGE_CHANNELS[0].millivolts.receive(),
+        CHARGE_CHANNELS[0].watts.receive(),
+    );
 
-    let topic_name = "desk-power/test/temperature";
-    let message = temperature.to_le_bytes();
-    let message = message.as_slice();
-    let size = 4;
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
-    let retain = false;
+    let future = select(TEMPERATURE_CH.receive(), ch0).await;
 
-    (topic_name, &msg_buffer[..size], qos, retain)
+    match future {
+        embassy_futures::select::Either::First(temperature) => {
+            let topic_name = "desk-power/test/temperature";
+            let message = temperature.to_le_bytes();
+            let message = message.as_slice();
+            let size = message.len();
+            msg_buffer[..size].copy_from_slice(message);
+            let qos = QualityOfService::QoS1;
+            let retain = false;
+
+            (topic_name, &msg_buffer[..size], qos, retain)
+        }
+        embassy_futures::select::Either::Second(ch0) => match ch0 {
+            Either3::First(value) => {
+                let topic_name = "desk-power/test/ch0/amps";
+                let message = value.to_le_bytes();
+                let message = message.as_slice();
+                let size = message.len();
+                msg_buffer[..size].copy_from_slice(message);
+                let qos = QualityOfService::QoS1;
+                let retain = false;
+
+                (topic_name, &msg_buffer[..size], qos, retain)
+            }
+            Either3::Second(value) => {
+                let topic_name = "desk-power/test/ch0/millivolts";
+                let message = value.to_le_bytes();
+                let message = message.as_slice();
+                let size = message.len();
+                msg_buffer[..size].copy_from_slice(message);
+                let qos = QualityOfService::QoS1;
+                let retain = false;
+
+                (topic_name, &msg_buffer[..size], qos, retain)
+            }
+            Either3::Third(value) => {
+                let topic_name = "desk-power/test/ch0/watts";
+                let message = value.to_le_bytes();
+                let message = message.as_slice();
+                let size = message.len();
+                msg_buffer[..size].copy_from_slice(message);
+                let qos = QualityOfService::QoS1;
+                let retain = false;
+
+                (topic_name, &msg_buffer[..size], qos, retain)
+            }
+        },
+    }
 }
