@@ -35,6 +35,9 @@ pub(crate) struct ChargeChannelStatus {
     pub amps: Channel<CriticalSectionRawMutex, f64, 10>,
     pub watts: Channel<CriticalSectionRawMutex, f64, 10>,
     pub millivolts: Channel<CriticalSectionRawMutex, f64, 10>,
+    pub out_milliamps: Channel<CriticalSectionRawMutex, f32, 10>,
+    pub out_watts: Channel<CriticalSectionRawMutex, u16, 10>,
+    pub out_millivolts: Channel<CriticalSectionRawMutex, u16, 10>,
 }
 
 impl ChargeChannelStatus {
@@ -43,6 +46,9 @@ impl ChargeChannelStatus {
             amps: Channel::new(),
             watts: Channel::new(),
             millivolts: Channel::new(),
+            out_milliamps: Channel::new(),
+            out_watts: Channel::new(),
+            out_millivolts: Channel::new(),
         }
     }
 }

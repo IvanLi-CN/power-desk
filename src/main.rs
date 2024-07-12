@@ -2,27 +2,15 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use core::{borrow::Borrow, cell::RefCell};
-
-use charge_channel::ChargeChannel;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_net::{Stack, StackResources};
-use embassy_sync::{
-    blocking_mutex::raw::{CriticalSectionRawMutex, RawMutex},
-    mutex::Mutex,
-};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
-    gpio::Io,
-    i2c::I2C,
-    peripherals::{Peripherals, I2C0},
-    prelude::*,
-    system::SystemControl,
-    timer::timg::TimerGroup,
-    Async,
+    clock::ClockControl, gpio::Io, i2c::I2C, peripherals::Peripherals, prelude::*,
+    system::SystemControl, timer::timg::TimerGroup,
 };
 use esp_wifi::wifi::WifiStaDevice;
 use mqtt::mqtt_task;
@@ -34,6 +22,7 @@ mod charge_channel;
 mod mqtt;
 mod temperature;
 mod wifi;
+mod error;
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -86,9 +75,13 @@ async fn main(spawner: Spawner) {
     let i2c_mutex = make_static!(Mutex::<CriticalSectionRawMutex, _>::new(i2c));
 
     let temperature_i2c_dev = I2cDevice::new(i2c_mutex);
-    let channel_i2c_dev = I2cDevice::new(i2c_mutex);
+    let ina226_i2c_dev = I2cDevice::new(i2c_mutex);
+    let sw3526_i2c_dev = I2cDevice::new(i2c_mutex);
+
     let temperature_i2c_dev = make_static!(temperature_i2c_dev);
-    let channel_i2c_dev = make_static!(channel_i2c_dev);
+    let ina226_i2c_dev = make_static!(ina226_i2c_dev);
+    let sw3526_i2c_dev = make_static!(sw3526_i2c_dev);
+    let pca9546a_i2c_dev = make_static!(I2cDevice::new(i2c_mutex));
 
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(&stack)).ok();
@@ -99,7 +92,11 @@ async fn main(spawner: Spawner) {
     spawner.spawn(temperature::task(temperature_i2c_dev)).ok();
 
     spawner
-        .spawn(charge_channel::task(channel_i2c_dev))
+        .spawn(charge_channel::task(
+            ina226_i2c_dev,
+            sw3526_i2c_dev,
+            pca9546a_i2c_dev,
+        ))
         .ok();
 
     loop {

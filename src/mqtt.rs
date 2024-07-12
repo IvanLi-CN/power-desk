@@ -1,6 +1,4 @@
-use core::future;
-
-use embassy_futures::select::{select, select3, Either3};
+use embassy_futures::select::{select, select3, Either, Either3};
 use embassy_net::{tcp::TcpSocket, IpAddress, IpEndpoint, Stack};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker, Timer};
@@ -125,6 +123,8 @@ pub async fn mqtt_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>
     }
 }
 
+type NextMessageInfo<'a> = (&'a str, &'a [u8], QualityOfService, bool);
+
 pub async fn waiting_wifi_connected() {
     loop {
         let wifi_connect_status = WIFI_CONNECT_STATUS.try_lock();
@@ -141,61 +141,119 @@ pub async fn waiting_wifi_connected() {
     }
 }
 
-pub async fn next_message(msg_buffer: &mut [u8]) -> (&str, &[u8], QualityOfService, bool) {
-    let ch0 = select3(
-        CHARGE_CHANNELS[0].amps.receive(),
+pub async fn next_message(msg_buffer: &mut [u8]) -> NextMessageInfo {
+    let temperature_future = TEMPERATURE_CH.receive();
+
+    let ch0_power_meter_future = select3(
         CHARGE_CHANNELS[0].millivolts.receive(),
+        CHARGE_CHANNELS[0].amps.receive(),
         CHARGE_CHANNELS[0].watts.receive(),
     );
+    let ch0_out_power_future = select3(
+        CHARGE_CHANNELS[0].out_millivolts.receive(),
+        CHARGE_CHANNELS[0].out_milliamps.receive(),
+        CHARGE_CHANNELS[0].out_watts.receive(),
+    );
 
-    let future = select(TEMPERATURE_CH.receive(), ch0).await;
+    let ch0_future = select(ch0_power_meter_future, ch0_out_power_future);
 
-    match future {
-        embassy_futures::select::Either::First(temperature) => {
-            let topic_name = "desk-power/test/temperature";
-            let message = temperature.to_le_bytes();
-            let message = message.as_slice();
-            let size = message.len();
-            msg_buffer[..size].copy_from_slice(message);
-            let qos = QualityOfService::QoS1;
-            let retain = false;
-
-            (topic_name, &msg_buffer[..size], qos, retain)
-        }
-        embassy_futures::select::Either::Second(ch0) => match ch0 {
-            Either3::First(value) => {
-                let topic_name = "desk-power/test/ch0/amps";
-                let message = value.to_le_bytes();
-                let message = message.as_slice();
-                let size = message.len();
-                msg_buffer[..size].copy_from_slice(message);
-                let qos = QualityOfService::QoS1;
-                let retain = false;
-
-                (topic_name, &msg_buffer[..size], qos, retain)
-            }
-            Either3::Second(value) => {
-                let topic_name = "desk-power/test/ch0/millivolts";
-                let message = value.to_le_bytes();
-                let message = message.as_slice();
-                let size = message.len();
-                msg_buffer[..size].copy_from_slice(message);
-                let qos = QualityOfService::QoS1;
-                let retain = false;
-
-                (topic_name, &msg_buffer[..size], qos, retain)
-            }
-            Either3::Third(value) => {
-                let topic_name = "desk-power/test/ch0/watts";
-                let message = value.to_le_bytes();
-                let message = message.as_slice();
-                let size = message.len();
-                msg_buffer[..size].copy_from_slice(message);
-                let qos = QualityOfService::QoS1;
-                let retain = false;
-
-                (topic_name, &msg_buffer[..size], qos, retain)
-            }
+    match select(temperature_future, ch0_future).await {
+        Either::First(value) => serialize_temperature(value, msg_buffer),
+        Either::Second(ch) => match ch {
+            Either::First(power) => match power {
+                Either3::First(value) => serialize_millivolts(value, msg_buffer, 0),
+                Either3::Second(value) => serialize_amps(value, msg_buffer, 0),
+                Either3::Third(value) => serialize_watts(value, msg_buffer, 0),
+            },
+            Either::Second(power) => match power {
+                Either3::First(value) => serialize_out_millivolts(value, msg_buffer, 0),
+                Either3::Second(value) => serialize_out_milliamps(value, msg_buffer, 0),
+                Either3::Third(value) => serialize_out_watts(value, msg_buffer, 0),
+            },
         },
     }
+}
+
+fn serialize_temperature(value: f32, msg_buffer: &mut [u8]) -> NextMessageInfo {
+    let topic_name = "desk-power/test/temperature";
+    let message = value.to_le_bytes();
+    let message = message.as_slice();
+    let size = message.len();
+    msg_buffer[..size].copy_from_slice(message);
+    let qos = QualityOfService::QoS1;
+    let retain = false;
+
+    (topic_name, &msg_buffer[..size], qos, retain)
+}
+
+fn serialize_millivolts(value: f64, msg_buffer: &mut [u8], ch: usize) -> NextMessageInfo {
+    let topic_name = "desk-power/test/ch0/millivolts";
+    let message = value.to_le_bytes();
+    let message = message.as_slice();
+    let size = message.len();
+    msg_buffer[..size].copy_from_slice(message);
+    let qos = QualityOfService::QoS1;
+    let retain = false;
+
+    (topic_name, &msg_buffer[..size], qos, retain)
+}
+
+fn serialize_amps(value: f64, msg_buffer: &mut [u8], ch: usize) -> NextMessageInfo {
+    let topic_name = "desk-power/test/ch0/amps";
+    let message = value.to_le_bytes();
+    let message = message.as_slice();
+    let size = message.len();
+    msg_buffer[..size].copy_from_slice(message);
+    let qos = QualityOfService::QoS1;
+    let retain = false;
+
+    (topic_name, &msg_buffer[..size], qos, retain)
+}
+
+fn serialize_watts(value: f64, msg_buffer: &mut [u8], ch: usize) -> NextMessageInfo {
+    let topic_name = "desk-power/test/ch0/watts";
+    let message = value.to_le_bytes();
+    let message = message.as_slice();
+    let size = message.len();
+    msg_buffer[..size].copy_from_slice(message);
+    let qos = QualityOfService::QoS1;
+    let retain = false;
+
+    (topic_name, &msg_buffer[..size], qos, retain)
+}
+
+fn serialize_out_millivolts(value: u16, msg_buffer: &mut [u8], ch: usize) -> NextMessageInfo {
+    let topic_name = "desk-power/test/ch0/out-millivolts";
+    let message = value.to_le_bytes();
+    let message = message.as_slice();
+    let size = message.len();
+    msg_buffer[..size].copy_from_slice(message);
+    let qos = QualityOfService::QoS1;
+    let retain = false;
+
+    (topic_name, &msg_buffer[..size], qos, retain)
+}
+
+fn serialize_out_milliamps(value: f32, msg_buffer: &mut [u8], ch: usize) -> NextMessageInfo {
+    let topic_name = "desk-power/test/ch0/out-milliamps";
+    let message = value.to_le_bytes();
+    let message = message.as_slice();
+    let size = message.len();
+    msg_buffer[..size].copy_from_slice(message);
+    let qos = QualityOfService::QoS1;
+    let retain = false;
+
+    (topic_name, &msg_buffer[..size], qos, retain)
+}
+
+fn serialize_out_watts(value: u16, msg_buffer: &mut [u8], ch: usize) -> NextMessageInfo {
+    let topic_name = "desk-power/test/ch0/out-watts";
+    let message = value.to_le_bytes();
+    let message = message.as_slice();
+    let size = message.len();
+    msg_buffer[..size].copy_from_slice(message);
+    let qos = QualityOfService::QoS1;
+    let retain = false;
+
+    (topic_name, &msg_buffer[..size], qos, retain)
 }

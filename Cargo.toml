@@ -50,8 +50,10 @@ embassy-futures = "0.1.1"
 embedded-hal-async = { version = "1.0.0" }
 embedded-hal-bus = { version = "0.2.0", features = ["defmt-03", "async"] }
 
-gx21m15 = { path = "../gx21m15.rs", features = ["async"], version = "*" }
+gx21m15 = { path = "../gx21m15-rs", features = ["async"], version = "*" }
 ina226 = { features = ["async"], version = "0.3.0" }
+sw3526 = { version = "0.1.0", path = "../sw3526-rs", features = ["async"] }
+pca9546a = { version = "0.1.0", path = "../pca9546a-rs", features = ["async"] }
 
 [profile.dev]
 # Rust debug is too slow.
