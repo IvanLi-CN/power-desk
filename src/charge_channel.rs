@@ -1,4 +1,5 @@
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
+use embassy_futures::select::{self, select};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_time::{Duration, Ticker, Timer};
 use embedded_hal_async::i2c::I2c;
@@ -79,7 +80,7 @@ where
     }
 
     pub async fn task(&mut self) {
-        let mut ticker = Ticker::every(Duration::from_secs(2));
+        let mut ticker = Ticker::every(Duration::from_secs(1));
 
         loop {
             ticker.next().await;
@@ -112,12 +113,25 @@ where
                     }
                 }
 
-                match self.sw3526_task_once().await {
-                    Ok(_) => {}
-                    Err(_) => {
-                        log::error!("SW3526 task error.");
+                log::warn!("task go");
+
+                let future = select(ticker.next(), self.sw3526_task_once()).await;
+
+                match future {
+                    select::Either::First(_) => {
+                        log::warn!("sw3526 task time out");
                     }
+                    select::Either::Second(result) => match result {
+                        Ok(_) => {
+                            log::info!("SW3526 task success");
+                        }
+                        Err(_) => {
+                            log::error!("SW3526 task error.");
+                        }
+                    },
                 }
+
+                log::warn!("wait for next task");
             }
         }
     }
@@ -164,12 +178,13 @@ where
     pub async fn sw3526_task_once(&mut self) -> Result<(), ChargeChannelError<E>> {
         self.select_mux_channel().await?;
 
+        log::info!("get protocol");
         match self.sw3526.get_protocol().await {
             Ok(protocol) => {
                 log::info!("Protocol: {:?}", protocol);
             }
             Err(err) => {
-                log::error!("Failed to select mux channel. {:?}", err);
+                log::error!("Failed to get protocol. {:?}", err);
                 return Err(ChargeChannelError::I2CError(err));
             }
         }

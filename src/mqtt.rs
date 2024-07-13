@@ -6,7 +6,7 @@ use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
 use heapless::Vec;
 use rust_mqtt::{
     client::{client::MqttClient, client_config::ClientConfig},
-    packet::v5::publish_packet::QualityOfService,
+    packet::v5::{publish_packet::QualityOfService, reason_codes::ReasonCode},
     utils::rng_generator::CountingRng,
 };
 use static_cell::make_static;
@@ -36,7 +36,7 @@ pub async fn mqtt_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>
     let send_message_buffer: &mut [u8] = make_static!([0u8; 128]);
 
     loop {
-        let mut ticker = Ticker::every(Duration::from_secs(10));
+        let mut ticker = Ticker::every(Duration::from_secs(5));
 
         let address = IpAddress::v4(192, 168, 31, 11);
 
@@ -114,6 +114,11 @@ pub async fn mqtt_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>
                         Ok(_) => log::info!("Sent"),
                         Err(err) => {
                             log::error!("Send error: {:?}", err);
+
+                            if matches!(err, ReasonCode::NoMatchingSubscribers) {
+                                continue;
+                            }
+
                             break;
                         }
                     }

@@ -48,7 +48,7 @@ static_cell = { version = "2.1.0", features = ["nightly"] }
 rust-mqtt = { version = "0.3.0", default-features = false, features = ["log"] }
 embassy-futures = "0.1.1"
 embedded-hal-async = { version = "1.0.0" }
-embedded-hal-bus = { version = "0.2.0", features = ["defmt-03", "async"] }
+embedded-hal-bus = { version = "0.2.0", features = ["async"] }
 
 gx21m15 = { path = "../gx21m15-rs", features = ["async"], version = "*" }
 ina226 = { features = ["async"], version = "0.3.0" }

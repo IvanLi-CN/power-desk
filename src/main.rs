@@ -20,7 +20,7 @@ use wifi::{connection, get_ip_addr, net_task};
 mod bus;
 mod charge_channel;
 mod mqtt;
-mod temperature;
+mod protector;
 mod wifi;
 mod error;
 
@@ -89,7 +89,7 @@ async fn main(spawner: Spawner) {
 
     spawner.spawn(mqtt_task(&stack)).ok();
 
-    spawner.spawn(temperature::task(temperature_i2c_dev)).ok();
+    spawner.spawn(protector::task(temperature_i2c_dev)).ok();
 
     spawner
         .spawn(charge_channel::task(

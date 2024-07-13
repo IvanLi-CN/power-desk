@@ -1,10 +1,6 @@
 use core::fmt::Display;
 
-use embassy_sync::{
-    blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex},
-    channel::Channel,
-    mutex::Mutex,
-};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, mutex::Mutex};
 
 #[derive(Debug, Clone, Copy)]
 pub enum WiFiConnectStatus {
