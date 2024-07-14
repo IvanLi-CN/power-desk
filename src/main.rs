@@ -23,6 +23,7 @@ mod mqtt;
 mod protector;
 mod wifi;
 mod error;
+mod helper;
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -68,7 +69,7 @@ async fn main(spawner: Spawner) {
         peripherals.I2C0,
         io.pins.gpio4,
         io.pins.gpio5,
-        100u32.kHz(),
+        400u32.kHz(),
         &clocks,
     );
 

@@ -1,6 +1,7 @@
 use core::fmt::Display;
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, mutex::Mutex};
+use sw3526::{AbnormalCaseResponse, ProtocolIndicationResponse, SystemStatusResponse};
 
 #[derive(Debug, Clone, Copy)]
 pub enum WiFiConnectStatus {
@@ -28,12 +29,16 @@ pub(crate) static CHARGE_CHANNELS: [ChargeChannelStatus; 4] = [
 ];
 
 pub(crate) struct ChargeChannelStatus {
+    pub millivolts: Channel<CriticalSectionRawMutex, f64, 10>,
     pub amps: Channel<CriticalSectionRawMutex, f64, 10>,
     pub watts: Channel<CriticalSectionRawMutex, f64, 10>,
-    pub millivolts: Channel<CriticalSectionRawMutex, f64, 10>,
-    pub out_milliamps: Channel<CriticalSectionRawMutex, f32, 10>,
-    pub out_watts: Channel<CriticalSectionRawMutex, u16, 10>,
-    pub out_millivolts: Channel<CriticalSectionRawMutex, u16, 10>,
+    pub in_millivolts: Channel<CriticalSectionRawMutex, u16, 10>,
+    pub protocol: Channel<CriticalSectionRawMutex, ProtocolIndicationResponse, 4>,
+    pub system_status: Channel<CriticalSectionRawMutex, SystemStatusResponse, 4>,
+    pub abnormal_case: Channel<CriticalSectionRawMutex, AbnormalCaseResponse, 4>,
+    pub buck_output_millivolts: Channel<CriticalSectionRawMutex, u16, 4>,
+    pub buck_output_limit_milliamps: Channel<CriticalSectionRawMutex, u16, 4>,
+    pub limit_watts: Channel<CriticalSectionRawMutex, u8, 4>,
 }
 
 impl ChargeChannelStatus {
@@ -42,9 +47,13 @@ impl ChargeChannelStatus {
             amps: Channel::new(),
             watts: Channel::new(),
             millivolts: Channel::new(),
-            out_milliamps: Channel::new(),
-            out_watts: Channel::new(),
-            out_millivolts: Channel::new(),
+            in_millivolts: Channel::new(),
+            protocol: Channel::new(),
+            system_status: Channel::new(),
+            abnormal_case: Channel::new(),
+            buck_output_millivolts: Channel::new(),
+            buck_output_limit_milliamps: Channel::new(),
+            limit_watts: Channel::new(),
         }
     }
 }

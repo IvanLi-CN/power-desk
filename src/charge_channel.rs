@@ -113,8 +113,6 @@ where
                     }
                 }
 
-                log::warn!("task go");
-
                 let future = select(ticker.next(), self.sw3526_task_once()).await;
 
                 match future {
@@ -178,10 +176,17 @@ where
     pub async fn sw3526_task_once(&mut self) -> Result<(), ChargeChannelError<E>> {
         self.select_mux_channel().await?;
 
-        log::info!("get protocol");
+        self.report_sw3526_limits().await?;
+        self.report_sw3526_status().await?;
+
+        Ok(())
+    }
+
+    async fn report_sw3526_status(&mut self) -> Result<(), ChargeChannelError<E>> {
         match self.sw3526.get_protocol().await {
             Ok(protocol) => {
                 log::info!("Protocol: {:?}", protocol);
+                self.charge_channel.protocol.send(protocol).await;
             }
             Err(err) => {
                 log::error!("Failed to get protocol. {:?}", err);
@@ -192,6 +197,7 @@ where
         match self.sw3526.get_system_status().await {
             Ok(status) => {
                 log::info!("Status: {:?}", status);
+                self.charge_channel.system_status.send(status).await;
             }
             Err(err) => {
                 return Err(ChargeChannelError::I2CError(err));
@@ -200,27 +206,58 @@ where
 
         match self.sw3526.get_abnormal_case().await {
             Ok(abnormal_case) => {
-                log::info!("Abnormal case: {:?}", abnormal_case);
+                log::info!("Abnormal case: {:?}", abnormal_case,);
+                self.charge_channel.abnormal_case.send(abnormal_case).await;
             }
             Err(err) => {
                 return Err(ChargeChannelError::I2CError(err));
             }
         }
 
-        match self.sw3526.get_adc_output_millivolts().await {
-            Ok(value) => {
-                log::info!("output_millivolts: {}", value);
-                self.charge_channel.out_millivolts.send(value).await;
+        match self.sw3526.get_buck_output_limit_milliamps().await {
+            Ok(milliamps) => {
+                log::info!("Buck output limit: {}", milliamps);
+                self.charge_channel
+                    .buck_output_limit_milliamps
+                    .send(milliamps)
+                    .await;
             }
             Err(err) => {
                 return Err(ChargeChannelError::I2CError(err));
             }
         }
 
-        match self.sw3526.get_adc_output_milliamps().await {
-            Ok(value) => {
-                log::info!("output_milliamps: {}", value);
-                self.charge_channel.out_milliamps.send(value).await;
+        Ok(())
+    }
+
+    async fn report_sw3526_limits(&mut self) -> Result<(), ChargeChannelError<E>> {
+        match self.sw3526.get_limit_watts().await {
+            Ok(watts) => {
+                log::info!("Limit: {}", watts);
+                self.charge_channel.limit_watts.send(watts).await;
+            }
+            Err(err) => {
+                return Err(ChargeChannelError::I2CError(err));
+            }
+        }
+
+        // match self.sw3526.get_adc_input_millivolts().await {
+        //     Ok(millivolts) => {
+        //         log::info!("ADC input: {}", millivolts);
+        //         self.charge_channel.in_millivolts.send(millivolts).await;
+        //     }
+        //     Err(err) => {
+        //         return Err(ChargeChannelError::I2CError(err));
+        //     }
+        // }
+
+        match self.sw3526.get_buck_output_millivolts().await {
+            Ok(millivolts) => {
+                log::info!("Buck output: {}", millivolts,);
+                self.charge_channel
+                    .buck_output_millivolts
+                    .send(millivolts)
+                    .await;
             }
             Err(err) => {
                 return Err(ChargeChannelError::I2CError(err));
