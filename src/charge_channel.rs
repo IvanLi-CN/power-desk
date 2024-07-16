@@ -1,9 +1,9 @@
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_futures::select::{self, select};
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker, Timer};
-use embedded_hal_async::i2c::I2c;
-use esp_hal::{i2c::I2C, peripherals::I2C0, Async};
+use embedded_hal_async::i2c::{I2c, SevenBitAddress};
+use esp_hal::{peripherals::I2C0, Async};
 use ina226::INA226;
 use pca9546a::PCA9546A;
 use sw3526::SW3526;
@@ -11,12 +11,18 @@ use sw3526::SW3526;
 use crate::{
     bus::{ChargeChannelStatus, CHARGE_CHANNELS},
     error::ChargeChannelError,
+    i2c_mux::{ChargeChannelIndex, I2cMux},
 };
+
+const PCA9546A_ADDRESS_0: SevenBitAddress = 0x70;
+const PCA9546A_ADDRESS_1: SevenBitAddress = 0x71;
+
+const INA226_0: SevenBitAddress = 0x40;
+const INA226_3: SevenBitAddress = 0x41;
 
 pub struct ChargeChannel<I2C> {
     ina226: INA226<I2C>,
     sw3526: SW3526<I2C>,
-    pca9546a: PCA9546A<I2C>,
     charge_channel: &'static ChargeChannelStatus,
 }
 
@@ -28,13 +34,11 @@ where
     pub fn new(
         ina226: INA226<I2C>,
         sw3526: SW3526<I2C>,
-        pca9546a: PCA9546A<I2C>,
         charge_channel: &'static ChargeChannelStatus,
     ) -> Self {
         Self {
             ina226,
             sw3526,
-            pca9546a,
             charge_channel,
         }
     }
@@ -65,8 +69,6 @@ where
     }
 
     async fn init_sw3526(&mut self) -> Result<(), ChargeChannelError<E>> {
-        self.select_mux_channel().await?;
-
         match self.sw3526.get_chip_version().await {
             Ok(value) => {
                 log::info!("sw3526 Chip version: {}", value);
@@ -79,59 +81,59 @@ where
         Ok(())
     }
 
-    pub async fn task(&mut self) {
-        let mut ticker = Ticker::every(Duration::from_secs(1));
-
-        loop {
-            ticker.next().await;
-
-            match self.init_ina226().await {
-                Ok(_) => {
-                    log::info!("INA226 init success");
-                }
-                Err(err) => {
-                    log::error!("INA226 init error. {:?}", err);
-                }
+    pub async fn init(&mut self) -> Result<(), ChargeChannelError<E>> {
+        match self.init_sw3526().await {
+            Ok(_) => {
+                log::info!("SW3526 init success");
             }
-
-            match self.init_sw3526().await {
-                Ok(_) => {
-                    log::info!("SW3526 init success");
-                }
-                Err(err) => {
-                    log::error!("SW3526 init error. {:?}", err);
-                }
-            }
-
-            loop {
-                ticker.next().await;
-
-                match self.ina226_task_once().await {
-                    Ok(_) => {}
-                    Err(_) => {
-                        log::error!("INA226 task error.");
-                    }
-                }
-
-                let future = select(ticker.next(), self.sw3526_task_once()).await;
-
-                match future {
-                    select::Either::First(_) => {
-                        log::warn!("sw3526 task time out");
-                    }
-                    select::Either::Second(result) => match result {
-                        Ok(_) => {
-                            log::info!("SW3526 task success");
-                        }
-                        Err(_) => {
-                            log::error!("SW3526 task error.");
-                        }
-                    },
-                }
-
-                log::warn!("wait for next task");
+            Err(err) => {
+                log::error!("SW3526 init error. {:?}", err);
+                return Err(err);
             }
         }
+
+        match self.init_ina226().await {
+            Ok(_) => {
+                log::info!("INA226 init success");
+            }
+            Err(err) => {
+                log::error!("INA226 init error. {:?}", err);
+                return Err(err);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn task_once(&mut self) -> Result<(), ChargeChannelError<E>> {
+        let mut timeout = Ticker::every(Duration::from_secs(1));
+
+        match self.ina226_task_once().await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("INA226 task error.");
+                return Err(err);
+            }
+        }
+
+        let future = select(timeout.next(), self.sw3526_task_once()).await;
+
+        match future {
+            select::Either::First(_) => {
+                log::warn!("sw3526 task time out");
+            }
+            select::Either::Second(result) => match result {
+                Ok(_) => {
+                    log::info!("SW3526 task success");
+                }
+                Err(err) => {
+                    log::error!("SW3526 task error.");
+                    return Err(err);
+                }
+            },
+        }
+
+        Ok(())
     }
 
     pub async fn ina226_task_once(&mut self) -> Result<(), ChargeChannelError<E>> {
@@ -174,8 +176,6 @@ where
     }
 
     pub async fn sw3526_task_once(&mut self) -> Result<(), ChargeChannelError<E>> {
-        self.select_mux_channel().await?;
-
         self.report_sw3526_limits().await?;
         self.report_sw3526_status().await?;
 
@@ -266,57 +266,106 @@ where
 
         Ok(())
     }
-
-    async fn select_mux_channel(&mut self) -> Result<(), ChargeChannelError<E>> {
-        self.pca9546a
-            .set_channel(pca9546a::Channel::Ch0)
-            .await
-            .map_err(|err| {
-                log::error!("Failed to select mux channel. {:?}", err);
-                ChargeChannelError::I2CError(err)
-            })
-    }
 }
 
 #[embassy_executor::task]
 pub(crate) async fn task(
-    ina226_i2c_dev: &'static mut I2cDevice<
-        'static,
-        CriticalSectionRawMutex,
-        I2C<'static, I2C0, Async>,
-    >,
-    sw3526_i2c_dev: &'static mut I2cDevice<
-        'static,
-        CriticalSectionRawMutex,
-        I2C<'static, I2C0, Async>,
-    >,
-    pca9546a_i2c_dev: &'static mut I2cDevice<
-        'static,
-        CriticalSectionRawMutex,
-        I2C<'static, I2C0, Async>,
-    >,
+    i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::I2C<'static, I2C0, Async>>,
 ) {
-    let pca9546a_address = 0x70;
-    let ina226_address = 0x40;
+    let ina226_i2c_dev = I2cDevice::new(i2c_mutex);
+    let sw3526_i2c_dev = I2cDevice::new(i2c_mutex);
 
-    let mut pca9546a = PCA9546A::new(pca9546a_i2c_dev, pca9546a_address);
-    let ina226 = INA226::new(ina226_i2c_dev, ina226_address);
+    let pca9546a_i2c_dev = I2cDevice::new(i2c_mutex);
+    let mux_chip_0: PCA9546A<
+        I2cDevice<CriticalSectionRawMutex, esp_hal::i2c::I2C<'_, I2C0, Async>>,
+    > = PCA9546A::new(pca9546a_i2c_dev, PCA9546A_ADDRESS_0);
+    let pca9546a_i2c_dev = I2cDevice::new(i2c_mutex);
+    let mux_chip_1 = PCA9546A::new(pca9546a_i2c_dev, PCA9546A_ADDRESS_1);
+
+    let mut mux = I2cMux::new(mux_chip_0, mux_chip_1);
+
+    let ina226 = INA226::new(ina226_i2c_dev, INA226_0);
     let sw3526 = SW3526::new(sw3526_i2c_dev);
 
+    let mut charge_channel_0 = ChargeChannel::new(ina226, sw3526, &CHARGE_CHANNELS[0]);
+
+    let ina226_i2c_dev = I2cDevice::new(i2c_mutex);
+    let sw3526_i2c_dev = I2cDevice::new(i2c_mutex);
+
+    let ina226 = INA226::new(ina226_i2c_dev, INA226_3);
+    let sw3526 = SW3526::new(sw3526_i2c_dev);
+
+    let mut charge_channel_3 = ChargeChannel::new(ina226, sw3526, &CHARGE_CHANNELS[3]);
+
+    let mut ticker = Ticker::every(Duration::from_secs(1));
+
     loop {
-        match pca9546a.set_channel(pca9546a::Channel::None).await {
+        ticker.next().await;
+
+        match mux.set_channel(ChargeChannelIndex::Ch0).await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("set channel#0 error. {:?}", err);
+                continue;
+            }
+        }
+        match charge_channel_0.init().await {
             Ok(_) => {
-                log::info!("init pca9546a success.");
-                break;
+                log::info!("init charge channel#0 success.");
             }
             Err(err) => {
-                log::error!("init pca9546a error. {:?}", err);
-                Timer::after(Duration::from_millis(100)).await;
+                log::error!("init charge channel#0 error. {:?}", err);
+                continue;
+            }
+        };
+
+        match mux.set_channel(ChargeChannelIndex::Ch3).await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("set channel#3 error. {:?}", err);
+                continue;
+            }
+        }
+        match charge_channel_3.init().await {
+            Ok(_) => {
+                log::info!("init charge channel#3 success.");
+            }
+            Err(err) => {
+                log::error!("init charge channel#3 error. {:?}", err);
+                continue;
+            }
+        }
+
+        loop {
+            ticker.next().await;
+
+            match mux.set_channel(ChargeChannelIndex::Ch0).await {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("set channel#0 error. {:?}", err);
+                    continue;
+                }
+            }
+            match charge_channel_0.task_once().await {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("charge channel#0 task error. {:?}", err);
+                }
+            }
+
+            match mux.set_channel(ChargeChannelIndex::Ch3).await {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("set channel#3 error. {:?}", err);
+                    continue;
+                }
+            }
+            match charge_channel_3.task_once().await {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("charge channel#3 task error. {:?}", err);
+                }
             }
         }
     }
-
-    let mut charge_channel = ChargeChannel::new(ina226, sw3526, pca9546a, &CHARGE_CHANNELS[0]);
-
-    charge_channel.task().await;
 }

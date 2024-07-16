@@ -106,7 +106,7 @@ pub async fn mqtt_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>
                 }
                 Either3::Third((topic_name, message, qos, retain)) => {
                     match client.send_message(topic_name, &message, qos, retain).await {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(err) => {
                             log::error!("Send error: {:?}", err);
 
@@ -163,29 +163,83 @@ pub async fn next_message<'a>(
         CHARGE_CHANNELS[0].limit_watts.receive(),
     );
 
-    let ch0_future = select3(ch0_power_meter_future, ch0_status_future, ch0_limit_future);
+    let ch3_power_meter_future = select3(
+        CHARGE_CHANNELS[3].millivolts.receive(),
+        CHARGE_CHANNELS[3].amps.receive(),
+        CHARGE_CHANNELS[3].watts.receive(),
+    );
+    let ch3_status_future = select3(
+        CHARGE_CHANNELS[3].system_status.receive(),
+        CHARGE_CHANNELS[3].protocol.receive(),
+        CHARGE_CHANNELS[3].abnormal_case.receive(),
+    );
+    let ch3_limit_future = select3(
+        CHARGE_CHANNELS[3].buck_output_millivolts.receive(),
+        CHARGE_CHANNELS[3].buck_output_limit_milliamps.receive(),
+        CHARGE_CHANNELS[3].limit_watts.receive(),
+    );
 
-    match select(temperature_future, ch0_future).await {
+    let ch0_future = select3(ch0_power_meter_future, ch0_status_future, ch0_limit_future);
+    let ch3_future = select3(ch3_power_meter_future, ch3_status_future, ch3_limit_future);
+
+    let channels_future = select(ch0_future, ch3_future);
+
+    match select(temperature_future, channels_future).await {
         Either::First(value) => serialize_temperature(value, topic_name, msg_buffer),
-        Either::Second(ch) => match ch {
-            Either3::First(power) => match power {
-                Either3::First(value) => serialize_millivolts(value, topic_name, msg_buffer, 0),
-                Either3::Second(value) => serialize_amps(value, topic_name, msg_buffer, 0),
-                Either3::Third(value) => serialize_watts(value, topic_name, msg_buffer, 0),
+        Either::Second(channels) => match channels {
+            Either::First(ch) => match ch {
+                Either3::First(power) => match power {
+                    Either3::First(value) => serialize_millivolts(value, topic_name, msg_buffer, 0),
+                    Either3::Second(value) => serialize_amps(value, topic_name, msg_buffer, 0),
+                    Either3::Third(value) => serialize_watts(value, topic_name, msg_buffer, 0),
+                },
+                Either3::Second(status) => match status {
+                    Either3::First(value) => {
+                        serialize_system_status(value, topic_name, msg_buffer, 0)
+                    }
+                    Either3::Second(value) => serialize_protocol(value, topic_name, msg_buffer, 0),
+                    Either3::Third(value) => {
+                        serialize_abnormal_case(value, topic_name, msg_buffer, 0)
+                    }
+                },
+                Either3::Third(limit) => match limit {
+                    Either3::First(value) => {
+                        serialize_buck_output_millivolts(value, topic_name, msg_buffer, 0)
+                    }
+                    Either3::Second(value) => {
+                        serialize_buck_output_limit_milliamps(value, topic_name, msg_buffer, 0)
+                    }
+                    Either3::Third(value) => {
+                        serialize_limit_watts(value, topic_name, msg_buffer, 0)
+                    }
+                },
             },
-            Either3::Second(status) => match status {
-                Either3::First(value) => serialize_system_status(value, topic_name, msg_buffer, 0),
-                Either3::Second(value) => serialize_protocol(value, topic_name, msg_buffer, 0),
-                Either3::Third(value) => serialize_abnormal_case(value, topic_name, msg_buffer, 0),
-            },
-            Either3::Third(limit) => match limit {
-                Either3::First(value) => {
-                    serialize_buck_output_millivolts(value, topic_name, msg_buffer, 0)
-                }
-                Either3::Second(value) => {
-                    serialize_buck_output_limit_milliamps(value, topic_name, msg_buffer, 0)
-                }
-                Either3::Third(value) => serialize_limit_watts(value, topic_name, msg_buffer, 0),
+            Either::Second(ch) => match ch {
+                Either3::First(power) => match power {
+                    Either3::First(value) => serialize_millivolts(value, topic_name, msg_buffer, 3),
+                    Either3::Second(value) => serialize_amps(value, topic_name, msg_buffer, 3),
+                    Either3::Third(value) => serialize_watts(value, topic_name, msg_buffer, 3),
+                },
+                Either3::Second(status) => match status {
+                    Either3::First(value) => {
+                        serialize_system_status(value, topic_name, msg_buffer, 3)
+                    }
+                    Either3::Second(value) => serialize_protocol(value, topic_name, msg_buffer, 3),
+                    Either3::Third(value) => {
+                        serialize_abnormal_case(value, topic_name, msg_buffer, 3)
+                    }
+                },
+                Either3::Third(limit) => match limit {
+                    Either3::First(value) => {
+                        serialize_buck_output_millivolts(value, topic_name, msg_buffer, 3)
+                    }
+                    Either3::Second(value) => {
+                        serialize_buck_output_limit_milliamps(value, topic_name, msg_buffer, 3)
+                    }
+                    Either3::Third(value) => {
+                        serialize_limit_watts(value, topic_name, msg_buffer, 3)
+                    }
+                },
             },
         },
     }
@@ -487,7 +541,6 @@ fn serialize_buck_output_limit_milliamps<'a>(
 
     (topic_name, &msg_buffer[..size], qos, retain)
 }
-
 
 #[inline(always)]
 fn serialize_limit_watts<'a>(
