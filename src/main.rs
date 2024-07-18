@@ -9,8 +9,13 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl, gpio::Io, i2c::I2C, peripherals::Peripherals, prelude::*,
-    system::SystemControl, timer::timg::TimerGroup,
+    clock::ClockControl,
+    gpio::Io,
+    i2c::I2C,
+    peripherals::Peripherals,
+    prelude::*,
+    system::SystemControl,
+    timer::{timg::TimerGroup, OneShotTimer, PeriodicTimer},
 };
 use esp_wifi::wifi::WifiStaDevice;
 use mqtt::mqtt_task;
@@ -19,12 +24,12 @@ use wifi::{connection, get_ip_addr, net_task};
 
 mod bus;
 mod charge_channel;
-mod mqtt;
-mod protector;
-mod wifi;
 mod error;
 mod helper;
 mod i2c_mux;
+mod mqtt;
+mod protector;
+mod wifi;
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -36,10 +41,17 @@ async fn main(spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0);
+    let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
+    let timer0 = OneShotTimer::new(systimer.alarm0.into());
+    let timers = [timer0];
+    let timers = make_static!(timers);
+    esp_hal_embassy::init(&clocks, timers);
 
-    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = PeriodicTimer::new(
+        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks, None)
+            .timer0
+            .into(),
+    );
     let _init = esp_wifi::initialize(
         esp_wifi::EspWifiInitFor::Wifi,
         timer,
@@ -87,9 +99,7 @@ async fn main(spawner: Spawner) {
 
     spawner.spawn(protector::task(temperature_i2c_dev)).ok();
 
-    spawner
-        .spawn(charge_channel::task(i2c_mutex))
-        .ok();
+    spawner.spawn(charge_channel::task(i2c_mutex)).ok();
 
     loop {
         // log::info!("Hello world!");

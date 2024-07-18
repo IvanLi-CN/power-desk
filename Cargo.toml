@@ -6,25 +6,24 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-esp-backtrace = { version = "0.12.0", features = [
+esp-backtrace = { version = "0.13.0", features = [
     "esp32c3",
     "exception-handler",
     "panic-handler",
     "println",
 ] }
-esp-hal = { version = "0.18.0", features = ["esp32c3", "async"] }
-esp-hal-embassy = { version = "0.1.0", features = [
+esp-hal = { version = "0.19.0", features = ["esp32c3", "async"] }
+esp-hal-embassy = { version = "0.2.0", features = [
     "esp32c3",
-    "time-timg0",
     "integrated-timers",
 ] }
-esp-println = { version = "0.9.1", features = ["esp32c3", "log"] }
+esp-println = { version = "0.10.0", features = ["esp32c3", "log"] }
 log = { version = "0.4.21" }
 
-embedded-svc = { version = "0.27.1", default-features = false, features = [] }
+embedded-svc = { version = "0.28.0", default-features = false, features = [] }
 embedded-io = "0.6.1"
 
-esp-wifi = { version = "0.6.0", features = [
+esp-wifi = { version = "0.7.0", features = [
     "esp32c3",
     "phy-enable-usb",
     "utils",
@@ -52,7 +51,7 @@ embedded-hal-bus = { version = "0.2.0", features = ["async"] }
 
 gx21m15 = { path = "../gx21m15-rs", features = ["async"], version = "*" }
 ina226 = { features = ["async"], version = "0.3.0" }
-sw3526 = { version = "0.1.0", path = "../sw3526-rs", features = ["async"] }
+sw3526 = { version = "*", path = "../sw3526-rs", features = ["async"] }
 pca9546a = { version = "0.1.0", path = "../pca9546a-rs", features = ["async"] }
 
 [profile.dev]
