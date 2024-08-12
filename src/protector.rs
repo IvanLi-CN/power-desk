@@ -1,4 +1,4 @@
-use embassy_embedded_hal::shared_bus::{asynch::i2c::I2cDevice, I2cDeviceError};
+use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_futures::select::{select, Either};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
 use embassy_time::{Duration, Ticker};
@@ -14,7 +14,7 @@ const MAX_FAIL_TIMES: u8 = 3;
 pub async fn task(
     i2c: &'static mut I2cDevice<'static, CriticalSectionRawMutex, I2C<'static, I2C0, Async>>,
 ) {
-    let sensor = Gx21m15::new(i2c, 0x48);
+    let sensor = Gx21m15::new(i2c, 0x49);
 
     let mut protector = Protector::new(sensor, &TEMPERATURE_CH);
 

@@ -1,58 +1,58 @@
 [package]
-name = "power-desk"
-version = "0.1.0"
 authors = ["Ivan Li <ivanli2048@gmail.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
+name = "power-desk"
+version = "0.1.0"
 
 [dependencies]
-esp-backtrace = { version = "0.13.0", features = [
-    "esp32c3",
-    "exception-handler",
-    "panic-handler",
-    "println",
-] }
-esp-hal = { version = "0.19.0", features = ["esp32c3", "async"] }
-esp-hal-embassy = { version = "0.2.0", features = [
-    "esp32c3",
-    "integrated-timers",
-] }
-esp-println = { version = "0.10.0", features = ["esp32c3", "log"] }
-log = { version = "0.4.21" }
+esp-backtrace = {version = "0.13.0", features = [
+  "esp32c3",
+  "exception-handler",
+  "panic-handler",
+  "println",
+]}
+esp-hal = {version = "0.19.0", features = ["esp32c3", "async"]}
+esp-hal-embassy = {version = "0.2.0", features = [
+  "esp32c3",
+  "integrated-timers",
+]}
+esp-println = {version = "0.10.0", features = ["esp32c3", "log"]}
+log = {version = "0.4.21"}
 
-embedded-svc = { version = "0.28.0", default-features = false, features = [] }
 embedded-io = "0.6.1"
+embedded-svc = {version = "0.28.0", default-features = false, features = []}
 
-esp-wifi = { version = "0.7.0", features = [
-    "esp32c3",
-    "phy-enable-usb",
-    "utils",
-    "wifi",
-    "embassy-net",
-] }
-heapless = { version = "0.8.0", default-features = false }
+esp-wifi = {version = "0.7.0", features = [
+  "esp32c3",
+  "phy-enable-usb",
+  "utils",
+  "wifi",
+  "embassy-net",
+]}
+heapless = {version = "0.8.0", default-features = false}
 
-embassy-executor = { version = "0.5.0", features = ["nightly"] }
-embassy-time = { version = "0.3.1", features = [] }
-embassy-net = { version = "0.4.0", features = [
-    "dhcpv4",
-    "tcp",
-    "dns",
-    "medium-ethernet",
-] }
 embassy-embedded-hal = "0.1.0"
+embassy-executor = {version = "0.5.0", features = ["nightly"]}
+embassy-net = {version = "0.4.0", features = [
+  "dhcpv4",
+  "tcp",
+  "dns",
+  "medium-ethernet",
+]}
 embassy-sync = "0.5.0"
+embassy-time = {version = "0.3.1", features = []}
 
-static_cell = { version = "2.1.0", features = ["nightly"] }
-rust-mqtt = { version = "0.3.0", default-features = false, features = ["log"] }
 embassy-futures = "0.1.1"
-embedded-hal-async = { version = "1.0.0" }
-embedded-hal-bus = { version = "0.2.0", features = ["async"] }
+embedded-hal-async = {version = "1.0.0"}
+embedded-hal-bus = {version = "0.2.0", features = ["async"]}
+rust-mqtt = {version = "0.3.0", default-features = false, features = ["log"]}
+static_cell = {version = "2.1.0", features = ["nightly"]}
 
-gx21m15 = { path = "../gx21m15-rs", features = ["async"], version = "*" }
-ina226 = { features = ["async"], version = "0.3.0" }
-sw3526 = { version = "*", path = "../sw3526-rs", features = ["async"] }
-pca9546a = { version = "0.1.0", path = "../pca9546a-rs", features = ["async"] }
+gx21m15 = {path = "../gx21m15-rs", features = ["async"], version = "*"}
+ina226 = {features = ["async"], version = "0.3.0"}
+pca9546a = {version = "0.1.0", path = "../pca9546a-rs", features = ["async"]}
+sw3526 = {version = "*", path = "../sw3526-rs", features = ["async"]}
 
 [profile.dev]
 # Rust debug is too slow.
@@ -60,10 +60,20 @@ pca9546a = { version = "0.1.0", path = "../pca9546a-rs", features = ["async"] }
 opt-level = "s"
 
 [profile.release]
-codegen-units = 1        # LLVM can perform better optimizations using a single thread
+codegen-units = 1 # LLVM can perform better optimizations using a single thread
 debug = 2
 debug-assertions = false
 incremental = false
 lto = 'fat'
 opt-level = 's'
 overflow-checks = false
+
+[lints.rust]
+unexpected_cfgs = {level = "warn", check-cfg = [
+  'cfg(no_mux_0)',
+  'cfg(no_mux_1)',
+  'cfg(no_charge_channel_0)',
+  'cfg(no_charge_channel_1)',
+  'cfg(no_charge_channel_2)',
+  'cfg(no_charge_channel_3)',
+]}

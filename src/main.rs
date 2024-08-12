@@ -15,7 +15,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    timer::{timg::TimerGroup, OneShotTimer, PeriodicTimer},
+    timer::{OneShotTimer, PeriodicTimer},
 };
 use esp_wifi::wifi::WifiStaDevice;
 use mqtt::mqtt_task;
@@ -82,7 +82,7 @@ async fn main(spawner: Spawner) {
         peripherals.I2C0,
         io.pins.gpio4,
         io.pins.gpio5,
-        400u32.kHz(),
+        100u32.kHz(),
         &clocks,
     );
 

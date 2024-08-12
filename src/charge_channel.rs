@@ -1,12 +1,13 @@
+use core::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_futures::select::{self, select};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::{Duration, Ticker};
 use embedded_hal_async::i2c::{I2c, SevenBitAddress};
 use esp_hal::{peripherals::I2C0, Async};
 use ina226::INA226;
 use pca9546a::PCA9546A;
-use sw3526::SW3526;
+use sw3526::{FastChargeConfig1, SW3526};
 
 use crate::{
     bus::{ChargeChannelStatus, CHARGE_CHANNELS},
@@ -17,13 +18,85 @@ use crate::{
 const PCA9546A_ADDRESS_0: SevenBitAddress = 0x70;
 const PCA9546A_ADDRESS_1: SevenBitAddress = 0x71;
 
-const INA226_0: SevenBitAddress = 0x40;
-const INA226_3: SevenBitAddress = 0x41;
+const INA226_0: SevenBitAddress = 0x44;
+const INA226_1: SevenBitAddress = 0x41;
+const INA226_2: SevenBitAddress = 0x45;
+const INA226_3: SevenBitAddress = 0x40;
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ChargeChannelOnlineStatus {
+    Online = 3,
+    INA226Online = 1,
+    SW3526Online = 2,
+    Offline = 0,
+}
+
+impl ChargeChannelOnlineStatus {
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            3 => ChargeChannelOnlineStatus::Online,
+            1 => ChargeChannelOnlineStatus::INA226Online,
+            2 => ChargeChannelOnlineStatus::SW3526Online,
+            _ => ChargeChannelOnlineStatus::Offline,
+        }
+    }
+}
+
+impl BitAnd for ChargeChannelOnlineStatus {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self::from_u8(self as u8 & rhs as u8)
+    }
+}
+
+impl BitOr for ChargeChannelOnlineStatus {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self::from_u8(self as u8 | rhs as u8)
+    }
+}
+
+impl BitXor for ChargeChannelOnlineStatus {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self::from_u8(self as u8 ^ rhs as u8)
+    }
+}
+
+impl Not for ChargeChannelOnlineStatus {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        Self::from_u8(!(self as u8))
+    }
+}
+
+impl BitAndAssign for ChargeChannelOnlineStatus {
+    fn bitand_assign(&mut self, rhs: Self) {
+        *self = *self & rhs;
+    }
+}
+
+impl BitOrAssign for ChargeChannelOnlineStatus {
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = *self | rhs;
+    }
+}
+
+impl BitXorAssign for ChargeChannelOnlineStatus {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        *self = *self ^ rhs;
+    }
+}
 
 pub struct ChargeChannel<I2C> {
     ina226: INA226<I2C>,
     sw3526: SW3526<I2C>,
     charge_channel: &'static ChargeChannelStatus,
+    online_status: ChargeChannelOnlineStatus,
 }
 
 impl<I2C, E> ChargeChannel<I2C>
@@ -40,6 +113,7 @@ where
             ina226,
             sw3526,
             charge_channel,
+            online_status: ChargeChannelOnlineStatus::Offline,
         }
     }
 
@@ -64,17 +138,43 @@ where
     }
 
     async fn init_ina226(&mut self) -> Result<(), ChargeChannelError<E>> {
-        self.config_ina226().await?;
+        match self.ina226.die_id().await {
+            Ok(_) => {
+                self.online_status |= ChargeChannelOnlineStatus::INA226Online;
+
+                self.config_ina226().await?;
+            }
+            Err(_) => self.online_status &= !ChargeChannelOnlineStatus::INA226Online,
+        }
+
         Ok(())
     }
 
     async fn init_sw3526(&mut self) -> Result<(), ChargeChannelError<E>> {
         match self.sw3526.get_chip_version().await {
             Ok(value) => {
+                self.online_status |= ChargeChannelOnlineStatus::SW3526Online;
                 log::info!("sw3526 Chip version: {}", value);
+
+                self.sw3526.set_i2c_writable().await.map_err(|err| {
+                    ChargeChannelError::I2CError(err)
+                })?;
+
+                self.sw3526
+                    .set_fast_charge_config_1(FastChargeConfig1 {
+                        pps1_disabled: false,
+                        pps0_disabled: false,
+                        pd_20v_disabled: false,
+                        pd_15v_disabled: false,
+                        pd_12v_disabled: false,
+                        pd_9v_disabled: false,
+                        pd_disabled: false,
+                    })
+                    .await
+                    .map_err(|err| ChargeChannelError::I2CError(err))?;
             }
-            Err(err) => {
-                return Err(ChargeChannelError::I2CError(err));
+            Err(_) => {
+                self.online_status &= !ChargeChannelOnlineStatus::SW3526Online;
             }
         };
 
@@ -106,6 +206,10 @@ where
     }
 
     pub async fn task_once(&mut self) -> Result<(), ChargeChannelError<E>> {
+        if self.online_status != ChargeChannelOnlineStatus::Online {
+            return Ok(());
+        }
+
         let mut timeout = Ticker::every(Duration::from_secs(1));
 
         match self.ina226_task_once().await {
@@ -268,13 +372,67 @@ where
     }
 }
 
+macro_rules! create_channel {
+    ($i2c_mutex:expr, $ina226_addr:expr, $charge_channel:expr) => {{
+        let ina226_i2c_dev = I2cDevice::new($i2c_mutex);
+        let sw3526_i2c_dev = I2cDevice::new($i2c_mutex);
+
+        let ina226 = INA226::new(ina226_i2c_dev, $ina226_addr);
+        let sw3526 = SW3526::new(sw3526_i2c_dev);
+
+        ChargeChannel::new(ina226, sw3526, $charge_channel)
+    }};
+}
+
+macro_rules! init_charge_channel {
+    ($mux:expr, $channel:expr, $charge_channel:expr) => {{
+        if $mux.get_channel_available($channel) {
+            match $mux.set_channel($channel).await {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("set channel#{} error. {:?}", $channel as u8, err);
+                    continue;
+                }
+            }
+            match $charge_channel.init().await {
+                Ok(_) => {
+                    log::info!("init charge channel#{} success.", $channel as u8);
+                }
+                Err(err) => {
+                    log::error!("init charge channel#{} error. {:?}", $channel as u8, err);
+                    continue;
+                }
+            };
+        }
+    }};
+}
+
+macro_rules! do_channel_task {
+    ($mux:expr, $channel:expr, $charge_channel:expr, $task_name:ident) => {{
+        match $mux.set_channel($channel).await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("set channel#{} error. {:?}", $channel as u8, err);
+                continue;
+            }
+        }
+        match $charge_channel.$task_name().await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!(
+                    concat!(stringify!($task_name), " channel#{} error. {:?}"),
+                    $channel as u8,
+                    err
+                );
+            }
+        }
+    }};
+}
+
 #[embassy_executor::task]
 pub(crate) async fn task(
     i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::I2C<'static, I2C0, Async>>,
 ) {
-    let ina226_i2c_dev = I2cDevice::new(i2c_mutex);
-    let sw3526_i2c_dev = I2cDevice::new(i2c_mutex);
-
     let pca9546a_i2c_dev = I2cDevice::new(i2c_mutex);
     let mux_chip_0: PCA9546A<
         I2cDevice<CriticalSectionRawMutex, esp_hal::i2c::I2C<'_, I2C0, Async>>,
@@ -284,88 +442,54 @@ pub(crate) async fn task(
 
     let mut mux = I2cMux::new(mux_chip_0, mux_chip_1);
 
-    let ina226 = INA226::new(ina226_i2c_dev, INA226_0);
-    let sw3526 = SW3526::new(sw3526_i2c_dev);
-
-    let mut charge_channel_0 = ChargeChannel::new(ina226, sw3526, &CHARGE_CHANNELS[0]);
-
-    let ina226_i2c_dev = I2cDevice::new(i2c_mutex);
-    let sw3526_i2c_dev = I2cDevice::new(i2c_mutex);
-
-    let ina226 = INA226::new(ina226_i2c_dev, INA226_3);
-    let sw3526 = SW3526::new(sw3526_i2c_dev);
-
-    let mut charge_channel_3 = ChargeChannel::new(ina226, sw3526, &CHARGE_CHANNELS[3]);
+    let mut charge_channel_0 = create_channel!(i2c_mutex, INA226_0, &CHARGE_CHANNELS[0]);
+    let mut charge_channel_1 = create_channel!(i2c_mutex, INA226_1, &CHARGE_CHANNELS[1]);
+    let mut charge_channel_2 = create_channel!(i2c_mutex, INA226_2, &CHARGE_CHANNELS[2]);
+    let mut charge_channel_3 = create_channel!(i2c_mutex, INA226_3, &CHARGE_CHANNELS[3]);
 
     let mut ticker = Ticker::every(Duration::from_secs(1));
 
     loop {
         ticker.next().await;
 
-        match mux.set_channel(ChargeChannelIndex::Ch0).await {
-            Ok(_) => {}
-            Err(err) => {
-                log::error!("set channel#0 error. {:?}", err);
-                continue;
-            }
-        }
-        match charge_channel_0.init().await {
-            Ok(_) => {
-                log::info!("init charge channel#0 success.");
-            }
-            Err(err) => {
-                log::error!("init charge channel#0 error. {:?}", err);
-                continue;
-            }
-        };
+        log::info!("init charge channel...");
 
-        match mux.set_channel(ChargeChannelIndex::Ch3).await {
-            Ok(_) => {}
-            Err(err) => {
-                log::error!("set channel#3 error. {:?}", err);
-                continue;
-            }
-        }
-        match charge_channel_3.init().await {
-            Ok(_) => {
-                log::info!("init charge channel#3 success.");
-            }
-            Err(err) => {
-                log::error!("init charge channel#3 error. {:?}", err);
-                continue;
-            }
-        }
+        mux.init().await;
+
+        init_charge_channel!(mux, ChargeChannelIndex::Ch0, &mut charge_channel_0);
+        init_charge_channel!(mux, ChargeChannelIndex::Ch1, &mut charge_channel_1);
+        init_charge_channel!(mux, ChargeChannelIndex::Ch2, &mut charge_channel_2);
+        init_charge_channel!(mux, ChargeChannelIndex::Ch3, &mut charge_channel_3);
+
+        log::info!("loop charge channels task...");
 
         loop {
             ticker.next().await;
 
-            match mux.set_channel(ChargeChannelIndex::Ch0).await {
-                Ok(_) => {}
-                Err(err) => {
-                    log::error!("set channel#0 error. {:?}", err);
-                    continue;
-                }
-            }
-            match charge_channel_0.task_once().await {
-                Ok(_) => {}
-                Err(err) => {
-                    log::error!("charge channel#0 task error. {:?}", err);
-                }
-            }
-
-            match mux.set_channel(ChargeChannelIndex::Ch3).await {
-                Ok(_) => {}
-                Err(err) => {
-                    log::error!("set channel#3 error. {:?}", err);
-                    continue;
-                }
-            }
-            match charge_channel_3.task_once().await {
-                Ok(_) => {}
-                Err(err) => {
-                    log::error!("charge channel#3 task error. {:?}", err);
-                }
-            }
+            do_channel_task!(
+                mux,
+                ChargeChannelIndex::Ch0,
+                &mut charge_channel_0,
+                task_once
+            );
+            do_channel_task!(
+                mux,
+                ChargeChannelIndex::Ch1,
+                &mut charge_channel_1,
+                task_once
+            );
+            do_channel_task!(
+                mux,
+                ChargeChannelIndex::Ch2,
+                &mut charge_channel_2,
+                task_once
+            );
+            do_channel_task!(
+                mux,
+                ChargeChannelIndex::Ch3,
+                &mut charge_channel_3,
+                task_once
+            );
         }
     }
 }

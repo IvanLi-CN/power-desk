@@ -1,4 +1,4 @@
-use embassy_futures::select::{select, select3, Either, Either3};
+use embassy_futures::select::{select, select3, select4, Either, Either3, Either4};
 use embassy_net::{tcp::TcpSocket, IpAddress, IpEndpoint, Stack};
 use embassy_time::{Duration, Ticker, Timer};
 use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
@@ -141,106 +141,94 @@ pub async fn waiting_wifi_connected() {
     }
 }
 
+macro_rules! define_channel_futures {
+    ($channel:expr) => {{
+        let ch_power_meter_future = select3(
+            $channel.millivolts.receive(),
+            $channel.amps.receive(),
+            $channel.watts.receive(),
+        );
+        let ch_status_future = select3(
+            $channel.system_status.receive(),
+            $channel.protocol.receive(),
+            $channel.abnormal_case.receive(),
+        );
+        let ch_limit_future = select3(
+            $channel.buck_output_millivolts.receive(),
+            $channel.buck_output_limit_milliamps.receive(),
+            $channel.limit_watts.receive(),
+        );
+
+        select3(ch_power_meter_future, ch_status_future, ch_limit_future)
+    }};
+}
+
+macro_rules! handle_channel {
+    ($ch:expr, $topic_name:expr, $msg_buffer:expr, $channel_index:expr) => {
+        match $ch {
+            Either3::First(power) => match power {
+                Either3::First(value) => {
+                    serialize_millivolts(value, $topic_name, $msg_buffer, $channel_index)
+                }
+                Either3::Second(value) => {
+                    serialize_amps(value, $topic_name, $msg_buffer, $channel_index)
+                }
+                Either3::Third(value) => {
+                    serialize_watts(value, $topic_name, $msg_buffer, $channel_index)
+                }
+            },
+            Either3::Second(status) => match status {
+                Either3::First(value) => {
+                    serialize_system_status(value, $topic_name, $msg_buffer, $channel_index)
+                }
+                Either3::Second(value) => {
+                    serialize_protocol(value, $topic_name, $msg_buffer, $channel_index)
+                }
+                Either3::Third(value) => {
+                    serialize_abnormal_case(value, $topic_name, $msg_buffer, $channel_index)
+                }
+            },
+            Either3::Third(limit) => match limit {
+                Either3::First(value) => serialize_buck_output_millivolts(
+                    value,
+                    $topic_name,
+                    $msg_buffer,
+                    $channel_index,
+                ),
+                Either3::Second(value) => serialize_buck_output_limit_milliamps(
+                    value,
+                    $topic_name,
+                    $msg_buffer,
+                    $channel_index,
+                ),
+                Either3::Third(value) => {
+                    serialize_limit_watts(value, $topic_name, $msg_buffer, $channel_index)
+                }
+            },
+        }
+    };
+}
+
 pub async fn next_message<'a>(
     topic_name: &'a mut String<64>,
     msg_buffer: &'a mut [u8],
 ) -> NextMessageInfo<'a> {
     let temperature_future = TEMPERATURE_CH.receive();
 
-    let ch0_power_meter_future = select3(
-        CHARGE_CHANNELS[0].millivolts.receive(),
-        CHARGE_CHANNELS[0].amps.receive(),
-        CHARGE_CHANNELS[0].watts.receive(),
-    );
-    let ch0_status_future = select3(
-        CHARGE_CHANNELS[0].system_status.receive(),
-        CHARGE_CHANNELS[0].protocol.receive(),
-        CHARGE_CHANNELS[0].abnormal_case.receive(),
-    );
-    let ch0_limit_future = select3(
-        CHARGE_CHANNELS[0].buck_output_millivolts.receive(),
-        CHARGE_CHANNELS[0].buck_output_limit_milliamps.receive(),
-        CHARGE_CHANNELS[0].limit_watts.receive(),
-    );
+    let ch0_future = define_channel_futures!(CHARGE_CHANNELS[0]);
+    let ch1_future = define_channel_futures!(CHARGE_CHANNELS[1]);
+    let ch2_future = define_channel_futures!(CHARGE_CHANNELS[2]);
+    let ch3_future = define_channel_futures!(CHARGE_CHANNELS[3]);
 
-    let ch3_power_meter_future = select3(
-        CHARGE_CHANNELS[3].millivolts.receive(),
-        CHARGE_CHANNELS[3].amps.receive(),
-        CHARGE_CHANNELS[3].watts.receive(),
-    );
-    let ch3_status_future = select3(
-        CHARGE_CHANNELS[3].system_status.receive(),
-        CHARGE_CHANNELS[3].protocol.receive(),
-        CHARGE_CHANNELS[3].abnormal_case.receive(),
-    );
-    let ch3_limit_future = select3(
-        CHARGE_CHANNELS[3].buck_output_millivolts.receive(),
-        CHARGE_CHANNELS[3].buck_output_limit_milliamps.receive(),
-        CHARGE_CHANNELS[3].limit_watts.receive(),
-    );
-
-    let ch0_future = select3(ch0_power_meter_future, ch0_status_future, ch0_limit_future);
-    let ch3_future = select3(ch3_power_meter_future, ch3_status_future, ch3_limit_future);
-
-    let channels_future = select(ch0_future, ch3_future);
+    let channels_future = select4(ch0_future, ch1_future, ch2_future, ch3_future);
 
     match select(temperature_future, channels_future).await {
         Either::First(value) => serialize_temperature(value, topic_name, msg_buffer),
         Either::Second(channels) => match channels {
-            Either::First(ch) => match ch {
-                Either3::First(power) => match power {
-                    Either3::First(value) => serialize_millivolts(value, topic_name, msg_buffer, 0),
-                    Either3::Second(value) => serialize_amps(value, topic_name, msg_buffer, 0),
-                    Either3::Third(value) => serialize_watts(value, topic_name, msg_buffer, 0),
-                },
-                Either3::Second(status) => match status {
-                    Either3::First(value) => {
-                        serialize_system_status(value, topic_name, msg_buffer, 0)
-                    }
-                    Either3::Second(value) => serialize_protocol(value, topic_name, msg_buffer, 0),
-                    Either3::Third(value) => {
-                        serialize_abnormal_case(value, topic_name, msg_buffer, 0)
-                    }
-                },
-                Either3::Third(limit) => match limit {
-                    Either3::First(value) => {
-                        serialize_buck_output_millivolts(value, topic_name, msg_buffer, 0)
-                    }
-                    Either3::Second(value) => {
-                        serialize_buck_output_limit_milliamps(value, topic_name, msg_buffer, 0)
-                    }
-                    Either3::Third(value) => {
-                        serialize_limit_watts(value, topic_name, msg_buffer, 0)
-                    }
-                },
-            },
-            Either::Second(ch) => match ch {
-                Either3::First(power) => match power {
-                    Either3::First(value) => serialize_millivolts(value, topic_name, msg_buffer, 3),
-                    Either3::Second(value) => serialize_amps(value, topic_name, msg_buffer, 3),
-                    Either3::Third(value) => serialize_watts(value, topic_name, msg_buffer, 3),
-                },
-                Either3::Second(status) => match status {
-                    Either3::First(value) => {
-                        serialize_system_status(value, topic_name, msg_buffer, 3)
-                    }
-                    Either3::Second(value) => serialize_protocol(value, topic_name, msg_buffer, 3),
-                    Either3::Third(value) => {
-                        serialize_abnormal_case(value, topic_name, msg_buffer, 3)
-                    }
-                },
-                Either3::Third(limit) => match limit {
-                    Either3::First(value) => {
-                        serialize_buck_output_millivolts(value, topic_name, msg_buffer, 3)
-                    }
-                    Either3::Second(value) => {
-                        serialize_buck_output_limit_milliamps(value, topic_name, msg_buffer, 3)
-                    }
-                    Either3::Third(value) => {
-                        serialize_limit_watts(value, topic_name, msg_buffer, 3)
-                    }
-                },
-            },
+            Either4::First(ch) => handle_channel!(ch, topic_name, msg_buffer, 0),
+            Either4::Second(ch) => handle_channel!(ch, topic_name, msg_buffer, 1),
+            Either4::Third(ch) => handle_channel!(ch, topic_name, msg_buffer, 2),
+            Either4::Fourth(ch) => handle_channel!(ch, topic_name, msg_buffer, 3),
         },
     }
 }
@@ -271,7 +259,7 @@ fn serialize_millivolts<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -290,7 +278,7 @@ fn serialize_temperature<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -312,7 +300,7 @@ fn serialize_amps<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -334,7 +322,7 @@ fn serialize_watts<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -356,7 +344,7 @@ fn serialize_out_millivolts<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -378,7 +366,7 @@ fn serialize_out_milliamps<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -400,7 +388,7 @@ fn serialize_out_watts<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -423,7 +411,7 @@ fn serialize_protocol<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -446,7 +434,7 @@ fn serialize_system_status<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -469,7 +457,7 @@ fn serialize_abnormal_case<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -491,7 +479,7 @@ fn serialize_in_millivolts<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -514,7 +502,7 @@ fn serialize_buck_output_millivolts<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -536,7 +524,7 @@ fn serialize_buck_output_limit_milliamps<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
@@ -558,7 +546,7 @@ fn serialize_limit_watts<'a>(
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS1;
+    let qos = QualityOfService::QoS0;
     let retain = false;
 
     (topic_name, &msg_buffer[..size], qos, retain)
