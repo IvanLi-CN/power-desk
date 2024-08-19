@@ -21,39 +21,88 @@ pub static WIFI_CONNECT_STATUS: Mutex<CriticalSectionRawMutex, WiFiConnectStatus
 
 pub(crate) static TEMPERATURE_CH: Channel<CriticalSectionRawMutex, f32, 10> = Channel::new();
 
-pub(crate) static CHARGE_CHANNELS: [ChargeChannelStatus; 4] = [
-    ChargeChannelStatus::new(),
-    ChargeChannelStatus::new(),
-    ChargeChannelStatus::new(),
-    ChargeChannelStatus::new(),
-];
 
-pub(crate) struct ChargeChannelStatus {
-    pub millivolts: Channel<CriticalSectionRawMutex, f64, 10>,
-    pub amps: Channel<CriticalSectionRawMutex, f64, 10>,
-    pub watts: Channel<CriticalSectionRawMutex, f64, 10>,
-    pub in_millivolts: Channel<CriticalSectionRawMutex, u16, 10>,
-    pub protocol: Channel<CriticalSectionRawMutex, ProtocolIndicationResponse, 4>,
-    pub system_status: Channel<CriticalSectionRawMutex, SystemStatusResponse, 4>,
-    pub abnormal_case: Channel<CriticalSectionRawMutex, AbnormalCaseResponse, 4>,
-    pub buck_output_millivolts: Channel<CriticalSectionRawMutex, u16, 4>,
-    pub buck_output_limit_milliamps: Channel<CriticalSectionRawMutex, u16, 4>,
-    pub limit_watts: Channel<CriticalSectionRawMutex, u8, 4>,
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ChargeChannelSeriesItem {
+    pub millivolts: f64,
+    pub amps: f64,
+    pub watts: f64,
+    pub protocol: ProtocolIndicationResponse,
+    pub system_status: SystemStatusResponse,
+    pub abnormal_case: AbnormalCaseResponse,
+    pub buck_output_millivolts: u16,
+    pub buck_output_limit_milliamps: u16,
+    pub limit_watts: u8,
 }
 
-impl ChargeChannelStatus {
-    const fn new() -> Self {
+impl ChargeChannelSeriesItem {
+    const BYTE_SIZE: usize = size_of::<f64>() * 3
+        + size_of::<ProtocolIndicationResponse>()
+        + size_of::<SystemStatusResponse>()
+        + size_of::<AbnormalCaseResponse>()
+        + size_of::<u16>() * 2
+        + size_of::<u8>();
+
+    pub fn to_bytes(&self) -> [u8; Self::BYTE_SIZE] {
+        let mut buffer = [0u8; Self::BYTE_SIZE];
+        let mut offset = 0;
+
+        // Helper function to copy bytes into the buffer
+        fn copy_into_slice(buffer: &mut [u8], offset: &mut usize, bytes: &[u8]) {
+            let end = *offset + bytes.len();
+            buffer[*offset..end].copy_from_slice(bytes);
+            *offset = end;
+        }
+
+        copy_into_slice(&mut buffer, &mut offset, &self.millivolts.to_le_bytes());
+        copy_into_slice(&mut buffer, &mut offset, &self.amps.to_le_bytes());
+        copy_into_slice(&mut buffer, &mut offset, &self.watts.to_le_bytes());
+
+        let protocol: u8 = self.protocol.into();
+        let system_status: u8 = self.system_status.into();
+        let abnormal_case: u8 = self.abnormal_case.into();
+        copy_into_slice(&mut buffer, &mut offset, &protocol.to_le_bytes());
+        copy_into_slice(&mut buffer, &mut offset, &system_status.to_le_bytes());
+        copy_into_slice(&mut buffer, &mut offset, &abnormal_case.to_le_bytes());
+
+        copy_into_slice(
+            &mut buffer,
+            &mut offset,
+            &self.buck_output_millivolts.to_le_bytes(),
+        );
+        copy_into_slice(
+            &mut buffer,
+            &mut offset,
+            &self.buck_output_limit_milliamps.to_le_bytes(),
+        );
+
+        copy_into_slice(&mut buffer, &mut offset, &self.limit_watts.to_le_bytes());
+
+        buffer
+    }
+}
+
+impl Default for ChargeChannelSeriesItem {
+    fn default() -> Self {
         Self {
-            amps: Channel::new(),
-            watts: Channel::new(),
-            millivolts: Channel::new(),
-            in_millivolts: Channel::new(),
-            protocol: Channel::new(),
-            system_status: Channel::new(),
-            abnormal_case: Channel::new(),
-            buck_output_millivolts: Channel::new(),
-            buck_output_limit_milliamps: Channel::new(),
-            limit_watts: Channel::new(),
+            millivolts: 0.0,
+            amps: 0.0,
+            watts: 0.0,
+            protocol: 0.into(),
+            system_status: 0.into(),
+            abnormal_case: 0.into(),
+            buck_output_millivolts: 0,
+            buck_output_limit_milliamps: 0,
+            limit_watts: 0,
         }
     }
 }
+
+pub(crate) type ChargeChannelSeriesItemChannel = Channel<CriticalSectionRawMutex, ChargeChannelSeriesItem, 10>;
+
+pub(crate) static CHARGE_CHANNEL_SERIES_ITEM_CHANNELS: [ChargeChannelSeriesItemChannel; 4] = [
+    Channel::new(),
+    Channel::new(),
+    Channel::new(),
+    Channel::new(),
+];

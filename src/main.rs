@@ -41,6 +41,11 @@ async fn main(spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
+    let io: Io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    let mut gpio6 = io.pins.gpio6;
+    gpio6.set_low();
+
     let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
     let timer0 = OneShotTimer::new(systimer.alarm0.into());
     let timers = [timer0];
@@ -74,15 +79,12 @@ async fn main(spawner: Spawner) {
         make_static!(StackResources::<3>::new()),
         seed
     ));
-
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     // Init I2C driver
     let i2c = I2C::new_async(
         peripherals.I2C0,
         io.pins.gpio4,
         io.pins.gpio5,
-        100u32.kHz(),
+        400u32.kHz(),
         &clocks,
     );
 

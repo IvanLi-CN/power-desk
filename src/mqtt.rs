@@ -11,7 +11,9 @@ use rust_mqtt::{
 use static_cell::make_static;
 use sw3526::{AbnormalCaseResponse, ProtocolIndicationResponse, SystemStatusResponse};
 
-use crate::bus::{WiFiConnectStatus, CHARGE_CHANNELS, TEMPERATURE_CH, WIFI_CONNECT_STATUS};
+use crate::bus::{
+    ChargeChannelSeriesItem, WiFiConnectStatus, CHARGE_CHANNEL_SERIES_ITEM_CHANNELS, TEMPERATURE_CH, WIFI_CONNECT_STATUS
+};
 
 const MQTT_TOPIC_PREFIX: &str = "power-desk/test/";
 
@@ -141,94 +143,26 @@ pub async fn waiting_wifi_connected() {
     }
 }
 
-macro_rules! define_channel_futures {
-    ($channel:expr) => {{
-        let ch_power_meter_future = select3(
-            $channel.millivolts.receive(),
-            $channel.amps.receive(),
-            $channel.watts.receive(),
-        );
-        let ch_status_future = select3(
-            $channel.system_status.receive(),
-            $channel.protocol.receive(),
-            $channel.abnormal_case.receive(),
-        );
-        let ch_limit_future = select3(
-            $channel.buck_output_millivolts.receive(),
-            $channel.buck_output_limit_milliamps.receive(),
-            $channel.limit_watts.receive(),
-        );
-
-        select3(ch_power_meter_future, ch_status_future, ch_limit_future)
-    }};
-}
-
-macro_rules! handle_channel {
-    ($ch:expr, $topic_name:expr, $msg_buffer:expr, $channel_index:expr) => {
-        match $ch {
-            Either3::First(power) => match power {
-                Either3::First(value) => {
-                    serialize_millivolts(value, $topic_name, $msg_buffer, $channel_index)
-                }
-                Either3::Second(value) => {
-                    serialize_amps(value, $topic_name, $msg_buffer, $channel_index)
-                }
-                Either3::Third(value) => {
-                    serialize_watts(value, $topic_name, $msg_buffer, $channel_index)
-                }
-            },
-            Either3::Second(status) => match status {
-                Either3::First(value) => {
-                    serialize_system_status(value, $topic_name, $msg_buffer, $channel_index)
-                }
-                Either3::Second(value) => {
-                    serialize_protocol(value, $topic_name, $msg_buffer, $channel_index)
-                }
-                Either3::Third(value) => {
-                    serialize_abnormal_case(value, $topic_name, $msg_buffer, $channel_index)
-                }
-            },
-            Either3::Third(limit) => match limit {
-                Either3::First(value) => serialize_buck_output_millivolts(
-                    value,
-                    $topic_name,
-                    $msg_buffer,
-                    $channel_index,
-                ),
-                Either3::Second(value) => serialize_buck_output_limit_milliamps(
-                    value,
-                    $topic_name,
-                    $msg_buffer,
-                    $channel_index,
-                ),
-                Either3::Third(value) => {
-                    serialize_limit_watts(value, $topic_name, $msg_buffer, $channel_index)
-                }
-            },
-        }
-    };
-}
-
 pub async fn next_message<'a>(
     topic_name: &'a mut String<64>,
     msg_buffer: &'a mut [u8],
 ) -> NextMessageInfo<'a> {
     let temperature_future = TEMPERATURE_CH.receive();
 
-    let ch0_future = define_channel_futures!(CHARGE_CHANNELS[0]);
-    let ch1_future = define_channel_futures!(CHARGE_CHANNELS[1]);
-    let ch2_future = define_channel_futures!(CHARGE_CHANNELS[2]);
-    let ch3_future = define_channel_futures!(CHARGE_CHANNELS[3]);
+    let ch0_future = CHARGE_CHANNEL_SERIES_ITEM_CHANNELS[0].receive();
+    let ch1_future = CHARGE_CHANNEL_SERIES_ITEM_CHANNELS[1].receive();
+    let ch2_future = CHARGE_CHANNEL_SERIES_ITEM_CHANNELS[2].receive();
+    let ch3_future = CHARGE_CHANNEL_SERIES_ITEM_CHANNELS[3].receive();
 
     let channels_future = select4(ch0_future, ch1_future, ch2_future, ch3_future);
 
     match select(temperature_future, channels_future).await {
         Either::First(value) => serialize_temperature(value, topic_name, msg_buffer),
         Either::Second(channels) => match channels {
-            Either4::First(ch) => handle_channel!(ch, topic_name, msg_buffer, 0),
-            Either4::Second(ch) => handle_channel!(ch, topic_name, msg_buffer, 1),
-            Either4::Third(ch) => handle_channel!(ch, topic_name, msg_buffer, 2),
-            Either4::Fourth(ch) => handle_channel!(ch, topic_name, msg_buffer, 3),
+            Either4::First(ch) => serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 0),
+            Either4::Second(ch) => serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 1),
+            Either4::Third(ch) => serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 2),
+            Either4::Fourth(ch) => serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 3),
         },
     }
 }
@@ -244,8 +178,8 @@ fn get_channel_str(ch: u8) -> &'static str {
 }
 
 #[inline(always)]
-fn serialize_millivolts<'a>(
-    value: f64,
+fn serialize_charge_channel_series_item<'a>(
+    value: ChargeChannelSeriesItem ,
     topic_name: &'a mut String<64>,
     msg_buffer: &'a mut [u8],
     ch: u8,
@@ -254,8 +188,8 @@ fn serialize_millivolts<'a>(
     topic_name.clear();
     topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
     topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/millivolts").unwrap();
-    let message = value.to_le_bytes();
+    topic_name.push_str("/series").unwrap();
+    let message = value.to_bytes();
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
@@ -274,274 +208,6 @@ fn serialize_temperature<'a>(
     topic_name.clear();
     topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
     topic_name.push_str("temperature").unwrap();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_amps<'a>(
-    value: f64,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/amps").unwrap();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_watts<'a>(
-    value: f64,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/watts").unwrap();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_out_millivolts<'a>(
-    value: u16,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/out-millivolts").unwrap();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_out_milliamps<'a>(
-    value: f32,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/out-milliamps").unwrap();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_out_watts<'a>(
-    value: u16,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/out-watts").unwrap();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_protocol<'a>(
-    value: ProtocolIndicationResponse,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/protocol-indication").unwrap();
-    let value: u8 = value.into();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_system_status<'a>(
-    value: SystemStatusResponse,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/system-status").unwrap();
-    let value: u8 = value.into();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_abnormal_case<'a>(
-    value: AbnormalCaseResponse,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/abnormal-case").unwrap();
-    let value: u8 = value.into();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_in_millivolts<'a>(
-    value: f64,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/in-millivolts").unwrap();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_buck_output_millivolts<'a>(
-    value: u16,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/buck-output-millivolts").unwrap();
-    log::info!("buck_output_millivolts: {}", value);
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_buck_output_limit_milliamps<'a>(
-    value: u16,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/buck-output-limit-milliamps").unwrap();
-    let message = value.to_le_bytes();
-    let message = message.as_slice();
-    let size = message.len();
-    msg_buffer[..size].copy_from_slice(message);
-    let qos = QualityOfService::QoS0;
-    let retain = false;
-
-    (topic_name, &msg_buffer[..size], qos, retain)
-}
-
-#[inline(always)]
-fn serialize_limit_watts<'a>(
-    value: u8,
-    topic_name: &'a mut String<64>,
-    msg_buffer: &'a mut [u8],
-    ch: u8,
-) -> NextMessageInfo<'a> {
-    let channel_name = get_channel_str(ch);
-    topic_name.clear();
-    topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str(channel_name).unwrap();
-    topic_name.push_str("/limit-watts").unwrap();
     let message = value.to_le_bytes();
     let message = message.as_slice();
     let size = message.len();

@@ -10,7 +10,10 @@ use pca9546a::PCA9546A;
 use sw3526::{FastChargeConfig1, SW3526};
 
 use crate::{
-    bus::{ChargeChannelStatus, CHARGE_CHANNELS},
+    bus::{
+        ChargeChannelSeriesItem, ChargeChannelSeriesItemChannel,
+        CHARGE_CHANNEL_SERIES_ITEM_CHANNELS,
+    },
     error::ChargeChannelError,
     i2c_mux::{ChargeChannelIndex, I2cMux},
 };
@@ -95,8 +98,9 @@ impl BitXorAssign for ChargeChannelOnlineStatus {
 pub struct ChargeChannel<I2C> {
     ina226: INA226<I2C>,
     sw3526: SW3526<I2C>,
-    charge_channel: &'static ChargeChannelStatus,
+    charge_channel: &'static ChargeChannelSeriesItemChannel,
     online_status: ChargeChannelOnlineStatus,
+    current_channel_state: ChargeChannelSeriesItem,
 }
 
 impl<I2C, E> ChargeChannel<I2C>
@@ -107,13 +111,14 @@ where
     pub fn new(
         ina226: INA226<I2C>,
         sw3526: SW3526<I2C>,
-        charge_channel: &'static ChargeChannelStatus,
+        charge_channel: &'static ChargeChannelSeriesItemChannel,
     ) -> Self {
         Self {
             ina226,
             sw3526,
             charge_channel,
             online_status: ChargeChannelOnlineStatus::Offline,
+            current_channel_state: ChargeChannelSeriesItem::default(),
         }
     }
 
@@ -156,9 +161,10 @@ where
                 self.online_status |= ChargeChannelOnlineStatus::SW3526Online;
                 log::info!("sw3526 Chip version: {}", value);
 
-                self.sw3526.set_i2c_writable().await.map_err(|err| {
-                    ChargeChannelError::I2CError(err)
-                })?;
+                self.sw3526
+                    .set_i2c_writable()
+                    .await
+                    .map_err(|err| ChargeChannelError::I2CError(err))?;
 
                 self.sw3526
                     .set_fast_charge_config_1(FastChargeConfig1 {
@@ -170,6 +176,11 @@ where
                         pd_9v_disabled: false,
                         pd_disabled: false,
                     })
+                    .await
+                    .map_err(|err| ChargeChannelError::I2CError(err))?;
+
+                self.sw3526
+                    .set_output_limit_watts(65)
                     .await
                     .map_err(|err| ChargeChannelError::I2CError(err))?;
             }
@@ -229,6 +240,7 @@ where
             select::Either::Second(result) => match result {
                 Ok(_) => {
                     log::info!("SW3526 task success");
+                    self.charge_channel.send(self.current_channel_state.clone()).await;
                 }
                 Err(err) => {
                     log::error!("SW3526 task error.");
@@ -243,8 +255,8 @@ where
     pub async fn ina226_task_once(&mut self) -> Result<(), ChargeChannelError<E>> {
         match self.ina226.bus_voltage_millivolts().await {
             Ok(value) => {
-                log::info!("Bus voltage: {}", value);
-                self.charge_channel.millivolts.send(value).await;
+                // log::info!("Bus voltage: {}", value);
+                self.current_channel_state.millivolts = value;
             }
             Err(err) => return Err(ChargeChannelError::I2CError(err)),
         };
@@ -260,7 +272,7 @@ where
             Ok(value) => {
                 log::info!("Current: {:?}", value);
                 if let Some(value) = value {
-                    self.charge_channel.amps.send(-value).await; // Negative current
+                    self.current_channel_state.amps = value;
                 }
             }
             Err(err) => return Err(ChargeChannelError::I2CError(err)),
@@ -270,7 +282,7 @@ where
             Ok(value) => {
                 log::info!("Power: {:?}", value);
                 if let Some(value) = value {
-                    self.charge_channel.watts.send(value).await;
+                    self.current_channel_state.watts = value;
                 }
             }
             Err(err) => return Err(ChargeChannelError::I2CError(err)),
@@ -289,19 +301,19 @@ where
     async fn report_sw3526_status(&mut self) -> Result<(), ChargeChannelError<E>> {
         match self.sw3526.get_protocol().await {
             Ok(protocol) => {
-                log::info!("Protocol: {:?}", protocol);
-                self.charge_channel.protocol.send(protocol).await;
+                // log::info!("Protocol: {:?}", protocol);
+                self.current_channel_state.protocol = protocol;
             }
             Err(err) => {
-                log::error!("Failed to get protocol. {:?}", err);
+                // log::error!("Failed to get protocol. {:?}", err);
                 return Err(ChargeChannelError::I2CError(err));
             }
         }
 
         match self.sw3526.get_system_status().await {
             Ok(status) => {
-                log::info!("Status: {:?}", status);
-                self.charge_channel.system_status.send(status).await;
+                // log::info!("Status: {:?}", status);
+                self.current_channel_state.system_status = status;
             }
             Err(err) => {
                 return Err(ChargeChannelError::I2CError(err));
@@ -310,8 +322,8 @@ where
 
         match self.sw3526.get_abnormal_case().await {
             Ok(abnormal_case) => {
-                log::info!("Abnormal case: {:?}", abnormal_case,);
-                self.charge_channel.abnormal_case.send(abnormal_case).await;
+                // log::info!("Abnormal case: {:?}", abnormal_case,);
+                self.current_channel_state.abnormal_case = abnormal_case;
             }
             Err(err) => {
                 return Err(ChargeChannelError::I2CError(err));
@@ -320,11 +332,8 @@ where
 
         match self.sw3526.get_buck_output_limit_milliamps().await {
             Ok(milliamps) => {
-                log::info!("Buck output limit: {}", milliamps);
-                self.charge_channel
-                    .buck_output_limit_milliamps
-                    .send(milliamps)
-                    .await;
+                // log::info!("Buck output limit: {}", milliamps);
+                self.current_channel_state.buck_output_limit_milliamps = milliamps;
             }
             Err(err) => {
                 return Err(ChargeChannelError::I2CError(err));
@@ -338,7 +347,7 @@ where
         match self.sw3526.get_limit_watts().await {
             Ok(watts) => {
                 log::info!("Limit: {}", watts);
-                self.charge_channel.limit_watts.send(watts).await;
+                self.current_channel_state.limit_watts = watts;
             }
             Err(err) => {
                 return Err(ChargeChannelError::I2CError(err));
@@ -358,10 +367,7 @@ where
         match self.sw3526.get_buck_output_millivolts().await {
             Ok(millivolts) => {
                 log::info!("Buck output: {}", millivolts,);
-                self.charge_channel
-                    .buck_output_millivolts
-                    .send(millivolts)
-                    .await;
+                self.current_channel_state.buck_output_millivolts = millivolts;
             }
             Err(err) => {
                 return Err(ChargeChannelError::I2CError(err));
@@ -442,10 +448,14 @@ pub(crate) async fn task(
 
     let mut mux = I2cMux::new(mux_chip_0, mux_chip_1);
 
-    let mut charge_channel_0 = create_channel!(i2c_mutex, INA226_0, &CHARGE_CHANNELS[0]);
-    let mut charge_channel_1 = create_channel!(i2c_mutex, INA226_1, &CHARGE_CHANNELS[1]);
-    let mut charge_channel_2 = create_channel!(i2c_mutex, INA226_2, &CHARGE_CHANNELS[2]);
-    let mut charge_channel_3 = create_channel!(i2c_mutex, INA226_3, &CHARGE_CHANNELS[3]);
+    let mut charge_channel_0 =
+        create_channel!(i2c_mutex, INA226_0, &CHARGE_CHANNEL_SERIES_ITEM_CHANNELS[0]);
+    let mut charge_channel_1 =
+        create_channel!(i2c_mutex, INA226_1, &CHARGE_CHANNEL_SERIES_ITEM_CHANNELS[1]);
+    let mut charge_channel_2 =
+        create_channel!(i2c_mutex, INA226_2, &CHARGE_CHANNEL_SERIES_ITEM_CHANNELS[2]);
+    let mut charge_channel_3 =
+        create_channel!(i2c_mutex, INA226_3, &CHARGE_CHANNEL_SERIES_ITEM_CHANNELS[3]);
 
     let mut ticker = Ticker::every(Duration::from_secs(1));
 
