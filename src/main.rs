@@ -2,7 +2,6 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_net::{Stack, StackResources};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
@@ -90,16 +89,13 @@ async fn main(spawner: Spawner) {
 
     let i2c_mutex = make_static!(Mutex::<CriticalSectionRawMutex, _>::new(i2c));
 
-    let temperature_i2c_dev = I2cDevice::new(i2c_mutex);
-    let temperature_i2c_dev = make_static!(temperature_i2c_dev);
-
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(&stack)).ok();
     spawner.spawn(get_ip_addr(&stack)).ok();
 
     spawner.spawn(mqtt_task(&stack)).ok();
 
-    spawner.spawn(protector::task(temperature_i2c_dev)).ok();
+    spawner.spawn(protector::task(i2c_mutex)).ok();
 
     spawner.spawn(charge_channel::task(i2c_mutex)).ok();
 

@@ -1,26 +1,64 @@
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_futures::select::{select, Either};
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
 use embedded_hal_async::i2c::I2c;
-use esp_hal::{i2c::I2C, peripherals::I2C0, Async};
+use esp_hal::{peripherals::I2C0, Async};
 use gx21m15::{Gx21m15, Gx21m15Config, OsFailQueueSize};
 
-use crate::bus::TEMPERATURE_CH;
+use crate::bus::{ProtectorSeriesItem, ProtectorSeriesItemChannel, PROTECTOR_SERIES_ITEM_CHANNEL};
 
 const MAX_FAIL_TIMES: u8 = 3;
 
 #[embassy_executor::task]
 pub async fn task(
-    i2c: &'static mut I2cDevice<'static, CriticalSectionRawMutex, I2C<'static, I2C0, Async>>,
+    i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::I2C<'static, I2C0, Async>>,
 ) {
-    let sensor = Gx21m15::new(i2c, 0x49);
+    let i2c_dev = I2cDevice::new(i2c_mutex);
+    let sensor_0 = Gx21m15::new(i2c_dev, 0x49);
+    let i2c_dev = I2cDevice::new(i2c_mutex);
+    let sensor_1 = Gx21m15::new(i2c_dev, 0x49);
 
-    let mut protector = Protector::new(sensor, &TEMPERATURE_CH);
+    let mut protector = Protector::new(sensor_0, sensor_1, &PROTECTOR_SERIES_ITEM_CHANNEL);
 
     log::info!("run temperature sensor task...");
 
-    protector.run_task().await;
+    let mut ticker = Ticker::every(Duration::from_millis(1000));
+
+    loop {
+        let mut fail_times = 0u8;
+        ticker.next().await;
+
+        // init
+        if let Err(err) = protector.init().await {
+            log::error!("Failed to init protector_1: {:?}", err);
+            continue;
+        }
+
+        // run
+        while fail_times < MAX_FAIL_TIMES {
+            ticker.next().await;
+
+            let future = select(ticker.next(), protector.run_task_once()).await;
+            match future {
+                Either::First(_) => {
+                    log::warn!("read temperature time out");
+                    continue;
+                }
+                Either::Second(res) => match res {
+                    Ok(_) => {
+                    }
+                    Err(err) => {
+                        fail_times += 1;
+                        log::warn!("Failed to get temperature#0: {:?}", err);
+                        continue;
+                    }
+                },
+            }
+
+            fail_times = 0;
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -38,143 +76,110 @@ impl Default for TemperatureConfig {
     }
 }
 
-struct Protector<'a, I2C, const TC_SIZE: usize> {
-    gx21m15: Gx21m15<I2C>,
+struct Protector<'a, I2C> {
+    gx21m15_0: Gx21m15<I2C>,
+    gx21m15_1: Gx21m15<I2C>,
     temperature_config: TemperatureConfig,
-    temperature_channel: &'a Channel<CriticalSectionRawMutex, f32, TC_SIZE>,
+    temperature_channel: &'a ProtectorSeriesItemChannel,
+    current_state: ProtectorSeriesItem,
 }
 
-impl<'a, I2C, E, const TC_SIZE: usize> Protector<'a, I2C, TC_SIZE>
+impl<'a, I2C, E> Protector<'a, I2C>
 where
     I2C: I2c<Error = E> + 'static,
     E: embedded_hal_async::i2c::Error + 'static,
 {
     pub fn new(
-        gx21m15: Gx21m15<I2C>,
-        temperature_channel: &'a Channel<CriticalSectionRawMutex, f32, TC_SIZE>,
+        gx21m15_0: Gx21m15<I2C>,
+        gx21m15_1: Gx21m15<I2C>,
+        temperature_channel: &'a ProtectorSeriesItemChannel,
     ) -> Self {
-        Self::new_with_config(gx21m15, temperature_channel, TemperatureConfig::default())
+        Self::new_with_config(
+            gx21m15_0,
+            gx21m15_1,
+            temperature_channel,
+            TemperatureConfig::default(),
+        )
     }
 
     pub fn new_with_config(
-        gx21m15: Gx21m15<I2C>,
-        temperature_channel: &'a Channel<CriticalSectionRawMutex, f32, TC_SIZE>,
+        gx21m15_0: Gx21m15<I2C>,
+        gx21m15_1: Gx21m15<I2C>,
+        temperature_channel: &'a ProtectorSeriesItemChannel,
         config: TemperatureConfig,
     ) -> Self {
         Self {
-            gx21m15,
+            gx21m15_0,
+            gx21m15_1,
             temperature_config: config,
             temperature_channel,
+            current_state: ProtectorSeriesItem::default(),
         }
     }
 
-    async fn init_gx21m15(&mut self) -> Result<(), E> {
-        let mut config = Gx21m15Config::new();
+    async fn init(&mut self) -> Result<(), E> {
+        macro_rules! init_gx21m15 {
+            ($gx21m15:expr) => {{
+                let mut config = Gx21m15Config::new();
 
-        config
-            .set_os_fail_queue_size(OsFailQueueSize::Four)
-            .set_os_mode(false)
-            .set_os_polarity(false)
-            .set_shutdown(false);
+                config
+                    .set_os_fail_queue_size(OsFailQueueSize::Four)
+                    .set_os_mode(false)
+                    .set_os_polarity(false)
+                    .set_shutdown(false);
 
-        match self.gx21m15.set_config(&config).await {
-            Ok(_) => {
-                log::info!("Configured sensor");
-            }
-            Err(err) => {
-                log::error!("Failed to configure sensor: {:?}", err);
-                return Err(err);
-            }
+                match $gx21m15.set_config(&config).await {
+                    Ok(_) => {
+                        log::info!("Configured sensor");
+                    }
+                    Err(err) => {
+                        log::error!("Failed to configure sensor: {:?}", err);
+                        return Err(err);
+                    }
+                }
+
+                // configure over temperature protection
+                match $gx21m15
+                    .set_temperature_hysteresis(self.temperature_config.hysteresis)
+                    .await
+                {
+                    Ok(_) => {
+                        let t = $gx21m15.get_temperature_hysteresis().await;
+                        log::info!("Temperature hysteresis: {:?}", t);
+                    }
+                    Err(err) => {
+                        log::error!("Failed to set temperature hysteresis: {:?}", err);
+                        return Err(err);
+                    }
+                }
+                match $gx21m15
+                    .set_temperature_over_shutdown(self.temperature_config.over_shutdown)
+                    .await
+                {
+                    Ok(_) => {
+                        let t = $gx21m15.get_temperature_over_shutdown().await;
+                        log::info!("Temperature over shutdown: {:?}", t);
+                    }
+                    Err(err) => {
+                        log::error!("Failed to set temperature over shutdown: {:?}", err);
+                        return Err(err);
+                    }
+                }
+            }};
         }
 
-        // configure over temperature protection
-        match self
-            .gx21m15
-            .set_temperature_hysteresis(self.temperature_config.hysteresis)
-            .await
-        {
-            Ok(_) => {
-                let t = self.gx21m15.get_temperature_hysteresis().await;
-                log::info!("Temperature hysteresis: {:?}", t);
-            }
-            Err(err) => {
-                log::error!("Failed to set temperature hysteresis: {:?}", err);
-                return Err(err);
-            }
-        }
-        match self
-            .gx21m15
-            .set_temperature_over_shutdown(self.temperature_config.over_shutdown)
-            .await
-        {
-            Ok(_) => {
-                let t = self.gx21m15.get_temperature_over_shutdown().await;
-                log::info!("Temperature over shutdown: {:?}", t);
-            }
-            Err(err) => {
-                log::error!("Failed to set temperature over shutdown: {:?}", err);
-                return Err(err);
-            }
-        }
+        init_gx21m15!(self.gx21m15_0);
+        init_gx21m15!(self.gx21m15_1);
 
         Ok(())
     }
 
-    pub async fn run_task(&mut self) {
-        let mut ticker = Ticker::every(Duration::from_secs(1));
+    pub async fn run_task_once(&mut self) -> Result<(), E> {
+        self.current_state.temperature_0 = self.gx21m15_0.get_temperature().await?;
+        self.current_state.temperature_1 = self.gx21m15_1.get_temperature().await?;
 
-        loop {
-            ticker.next().await;
+        self.temperature_channel.send(self.current_state).await;
 
-            let mut fail_times = 0u8;
-
-            let future = select(ticker.next(), self.init_gx21m15()).await;
-
-            match future {
-                Either::First(_) => {
-                    log::warn!("read temperature time out");
-                    continue;
-                }
-                Either::Second(result) => match result {
-                    Ok(_) => {
-                        log::info!("Temperature sensor init success");
-                    }
-                    Err(err) => {
-                        log::error!("Temperature sensor init error: {:?}", err);
-                        continue;
-                    }
-                },
-            }
-
-            loop {
-                let future = select(ticker.next(), self.gx21m15.get_temperature()).await;
-
-                match future {
-                    Either::First(_) => {
-                        fail_times += 1;
-                        log::warn!("read temperature time out");
-                    }
-                    Either::Second(temp) => match temp {
-                        Ok(temp) => {
-                            log::info!("Temperature: {}℃", temp);
-
-                            fail_times = 0;
-                            self.temperature_channel.send(temp).await;
-                        }
-                        Err(err) => {
-                            fail_times += 1;
-                            log::warn!("Failed to get temperature: {:?}", err);
-                        }
-                    },
-                }
-
-                if fail_times >= MAX_FAIL_TIMES {
-                    log::error!("too many failures, re-init temperature sensor");
-                    break;
-                }
-
-                ticker.next().await;
-            }
-        }
+        Ok(())
     }
 }

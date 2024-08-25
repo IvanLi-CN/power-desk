@@ -7,7 +7,6 @@ use sw3526::{AbnormalCaseResponse, ProtocolIndicationResponse, SystemStatusRespo
 pub enum WiFiConnectStatus {
     Connecting,
     Connected,
-    Failed,
 }
 
 impl Display for WiFiConnectStatus {
@@ -19,8 +18,43 @@ impl Display for WiFiConnectStatus {
 pub static WIFI_CONNECT_STATUS: Mutex<CriticalSectionRawMutex, WiFiConnectStatus> =
     Mutex::new(WiFiConnectStatus::Connecting);
 
-pub(crate) static TEMPERATURE_CH: Channel<CriticalSectionRawMutex, f32, 10> = Channel::new();
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ProtectorSeriesItem {
+    pub temperature_0: f32,
+    pub temperature_1: f32,
+}
 
+impl ProtectorSeriesItem {
+    const BYTE_SIZE: usize = size_of::<f32>() * 2;
+    pub fn to_bytes(&self) -> [u8; Self::BYTE_SIZE] {
+        let mut buffer = [0u8; Self::BYTE_SIZE];
+        let mut offset = 0;
+
+        fn copy_into_slice(buffer: &mut [u8], offset: &mut usize, bytes: &[u8]) {
+            let end = *offset + bytes.len();
+            buffer[*offset..end].copy_from_slice(bytes);
+            *offset = end;
+        }
+
+        copy_into_slice(&mut buffer, &mut offset, &self.temperature_0.to_le_bytes());
+        copy_into_slice(&mut buffer, &mut offset, &self.temperature_1.to_le_bytes());
+        buffer
+    }
+}
+
+
+impl Default for ProtectorSeriesItem {
+    fn default() -> Self {
+        Self {
+            temperature_0: 0.0,
+            temperature_1: 0.0,
+        }
+    }
+}
+
+pub(crate) type ProtectorSeriesItemChannel = Channel<CriticalSectionRawMutex, ProtectorSeriesItem, 10>;
+
+pub(crate) static PROTECTOR_SERIES_ITEM_CHANNEL: ProtectorSeriesItemChannel = Channel::new();
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ChargeChannelSeriesItem {
@@ -98,7 +132,8 @@ impl Default for ChargeChannelSeriesItem {
     }
 }
 
-pub(crate) type ChargeChannelSeriesItemChannel = Channel<CriticalSectionRawMutex, ChargeChannelSeriesItem, 10>;
+pub(crate) type ChargeChannelSeriesItemChannel =
+    Channel<CriticalSectionRawMutex, ChargeChannelSeriesItem, 10>;
 
 pub(crate) static CHARGE_CHANNEL_SERIES_ITEM_CHANNELS: [ChargeChannelSeriesItemChannel; 4] = [
     Channel::new(),

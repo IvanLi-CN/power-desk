@@ -9,10 +9,10 @@ use rust_mqtt::{
     utils::rng_generator::CountingRng,
 };
 use static_cell::make_static;
-use sw3526::{AbnormalCaseResponse, ProtocolIndicationResponse, SystemStatusResponse};
 
 use crate::bus::{
-    ChargeChannelSeriesItem, WiFiConnectStatus, CHARGE_CHANNEL_SERIES_ITEM_CHANNELS, TEMPERATURE_CH, WIFI_CONNECT_STATUS
+    ChargeChannelSeriesItem, ProtectorSeriesItem, WiFiConnectStatus,
+    CHARGE_CHANNEL_SERIES_ITEM_CHANNELS, PROTECTOR_SERIES_ITEM_CHANNEL, WIFI_CONNECT_STATUS,
 };
 
 const MQTT_TOPIC_PREFIX: &str = "power-desk/test/";
@@ -147,7 +147,7 @@ pub async fn next_message<'a>(
     topic_name: &'a mut String<64>,
     msg_buffer: &'a mut [u8],
 ) -> NextMessageInfo<'a> {
-    let temperature_future = TEMPERATURE_CH.receive();
+    let protector_future = PROTECTOR_SERIES_ITEM_CHANNEL.receive();
 
     let ch0_future = CHARGE_CHANNEL_SERIES_ITEM_CHANNELS[0].receive();
     let ch1_future = CHARGE_CHANNEL_SERIES_ITEM_CHANNELS[1].receive();
@@ -156,13 +156,21 @@ pub async fn next_message<'a>(
 
     let channels_future = select4(ch0_future, ch1_future, ch2_future, ch3_future);
 
-    match select(temperature_future, channels_future).await {
-        Either::First(value) => serialize_temperature(value, topic_name, msg_buffer),
+    match select(protector_future, channels_future).await {
+        Either::First(value) => serialize_protector(value, topic_name, msg_buffer),
         Either::Second(channels) => match channels {
-            Either4::First(ch) => serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 0),
-            Either4::Second(ch) => serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 1),
-            Either4::Third(ch) => serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 2),
-            Either4::Fourth(ch) => serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 3),
+            Either4::First(ch) => {
+                serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 0)
+            }
+            Either4::Second(ch) => {
+                serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 1)
+            }
+            Either4::Third(ch) => {
+                serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 2)
+            }
+            Either4::Fourth(ch) => {
+                serialize_charge_channel_series_item(ch, topic_name, msg_buffer, 3)
+            }
         },
     }
 }
@@ -179,7 +187,7 @@ fn get_channel_str(ch: u8) -> &'static str {
 
 #[inline(always)]
 fn serialize_charge_channel_series_item<'a>(
-    value: ChargeChannelSeriesItem ,
+    value: ChargeChannelSeriesItem,
     topic_name: &'a mut String<64>,
     msg_buffer: &'a mut [u8],
     ch: u8,
@@ -200,15 +208,15 @@ fn serialize_charge_channel_series_item<'a>(
 }
 
 #[inline(always)]
-fn serialize_temperature<'a>(
-    value: f32,
+fn serialize_protector<'a>(
+    value: ProtectorSeriesItem,
     topic_name: &'a mut String<64>,
     msg_buffer: &'a mut [u8],
 ) -> NextMessageInfo<'a> {
     topic_name.clear();
     topic_name.push_str(MQTT_TOPIC_PREFIX).unwrap();
-    topic_name.push_str("temperature").unwrap();
-    let message = value.to_le_bytes();
+    topic_name.push_str("protector").unwrap();
+    let message = value.to_bytes();
     let message = message.as_slice();
     let size = message.len();
     msg_buffer[..size].copy_from_slice(message);
