@@ -5,6 +5,7 @@ use embassy_time::{Duration, Ticker};
 use embedded_hal_async::i2c::I2c;
 use esp_hal::{peripherals::I2C0, Async};
 use gx21m15::{Gx21m15, Gx21m15Config, OsFailQueueSize};
+use ina226::INA226;
 
 use crate::bus::{ProtectorSeriesItem, ProtectorSeriesItemChannel, PROTECTOR_SERIES_ITEM_CHANNEL};
 
@@ -18,8 +19,10 @@ pub async fn task(
     let sensor_0 = Gx21m15::new(i2c_dev, 0x49);
     let i2c_dev = I2cDevice::new(i2c_mutex);
     let sensor_1 = Gx21m15::new(i2c_dev, 0x49);
+    let i2c_dev = I2cDevice::new(i2c_mutex);
+    let ina226 = INA226::new(i2c_dev, 0x43);
 
-    let mut protector = Protector::new(sensor_0, sensor_1, &PROTECTOR_SERIES_ITEM_CHANNEL);
+    let mut protector = Protector::new(sensor_0, sensor_1, ina226, &PROTECTOR_SERIES_ITEM_CHANNEL);
 
     log::info!("run temperature sensor task...");
 
@@ -46,8 +49,7 @@ pub async fn task(
                     continue;
                 }
                 Either::Second(res) => match res {
-                    Ok(_) => {
-                    }
+                    Ok(_) => {}
                     Err(err) => {
                         fail_times += 1;
                         log::warn!("Failed to get temperature#0: {:?}", err);
@@ -79,6 +81,7 @@ impl Default for TemperatureConfig {
 struct Protector<'a, I2C> {
     gx21m15_0: Gx21m15<I2C>,
     gx21m15_1: Gx21m15<I2C>,
+    ina226: INA226<I2C>,
     temperature_config: TemperatureConfig,
     temperature_channel: &'a ProtectorSeriesItemChannel,
     current_state: ProtectorSeriesItem,
@@ -92,11 +95,13 @@ where
     pub fn new(
         gx21m15_0: Gx21m15<I2C>,
         gx21m15_1: Gx21m15<I2C>,
+        ina226: INA226<I2C>,
         temperature_channel: &'a ProtectorSeriesItemChannel,
     ) -> Self {
         Self::new_with_config(
             gx21m15_0,
             gx21m15_1,
+            ina226,
             temperature_channel,
             TemperatureConfig::default(),
         )
@@ -105,12 +110,14 @@ where
     pub fn new_with_config(
         gx21m15_0: Gx21m15<I2C>,
         gx21m15_1: Gx21m15<I2C>,
+        ina226: INA226<I2C>,
         temperature_channel: &'a ProtectorSeriesItemChannel,
         config: TemperatureConfig,
     ) -> Self {
         Self {
             gx21m15_0,
             gx21m15_1,
+            ina226,
             temperature_config: config,
             temperature_channel,
             current_state: ProtectorSeriesItem::default(),
@@ -171,12 +178,46 @@ where
         init_gx21m15!(self.gx21m15_0);
         init_gx21m15!(self.gx21m15_1);
 
+        self.init_ina226().await?;
+
+        Ok(())
+    }
+
+    async fn init_ina226(&mut self) -> Result<(), E> {
+        let config = ina226::Config {
+            mode: ina226::MODE::ShuntBusVoltageContinuous,
+            avg: ina226::AVG::_4,
+            vbusct: ina226::VBUSCT::_588us,
+            vshct: ina226::VSHCT::_588us,
+        };
+
+        self.ina226.set_configuration(&config).await?;
+        self.ina226.callibrate(0.01, 5.0).await?;
+
         Ok(())
     }
 
     pub async fn run_task_once(&mut self) -> Result<(), E> {
         self.current_state.temperature_0 = self.gx21m15_0.get_temperature().await?;
         self.current_state.temperature_1 = self.gx21m15_1.get_temperature().await?;
+
+        self.current_state.millivolts = self.ina226.bus_voltage_millivolts().await?;
+        match self.ina226.current_amps().await? {
+            Some(amps) => {
+                self.current_state.amps = -amps;
+            }
+            None => {
+                log::info!("Failed to read input current");
+            }
+        }
+        match self.ina226.power_watts().await? {
+            Some(watts) => {
+                self.current_state.watts = watts;
+            }
+            None => {
+                log::info!("Failed to read input power");
+            }
+        }
 
         self.temperature_channel.send(self.current_state).await;
 

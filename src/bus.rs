@@ -22,10 +22,13 @@ pub static WIFI_CONNECT_STATUS: Mutex<CriticalSectionRawMutex, WiFiConnectStatus
 pub(crate) struct ProtectorSeriesItem {
     pub temperature_0: f32,
     pub temperature_1: f32,
+    pub millivolts: f64,
+    pub amps: f64,
+    pub watts: f64,
 }
 
 impl ProtectorSeriesItem {
-    const BYTE_SIZE: usize = size_of::<f32>() * 2;
+    const BYTE_SIZE: usize = size_of::<f32>() * 2 + size_of::<f64>() * 3;
     pub fn to_bytes(&self) -> [u8; Self::BYTE_SIZE] {
         let mut buffer = [0u8; Self::BYTE_SIZE];
         let mut offset = 0;
@@ -38,6 +41,9 @@ impl ProtectorSeriesItem {
 
         copy_into_slice(&mut buffer, &mut offset, &self.temperature_0.to_le_bytes());
         copy_into_slice(&mut buffer, &mut offset, &self.temperature_1.to_le_bytes());
+        copy_into_slice(&mut buffer, &mut offset, &self.millivolts.to_le_bytes());
+        copy_into_slice(&mut buffer, &mut offset, &self.amps.to_le_bytes());
+        copy_into_slice(&mut buffer, &mut offset, &self.watts.to_le_bytes());
         buffer
     }
 }
@@ -48,6 +54,9 @@ impl Default for ProtectorSeriesItem {
         Self {
             temperature_0: 0.0,
             temperature_1: 0.0,
+            millivolts: 0.0,
+            amps: 0.0,
+            watts: 0.0,
         }
     }
 }
