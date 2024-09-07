@@ -3,6 +3,8 @@ use core::fmt::Display;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, mutex::Mutex};
 use sw3526::{AbnormalCaseResponse, ProtocolIndicationResponse, SystemStatusResponse};
 
+use crate::protector::VinState;
+
 #[derive(Debug, Clone, Copy)]
 pub enum WiFiConnectStatus {
     Connecting,
@@ -25,10 +27,11 @@ pub(crate) struct ProtectorSeriesItem {
     pub millivolts: f64,
     pub amps: f64,
     pub watts: f64,
+    pub vin_status: VinState,
 }
 
 impl ProtectorSeriesItem {
-    const BYTE_SIZE: usize = size_of::<f32>() * 2 + size_of::<f64>() * 3;
+    const BYTE_SIZE: usize = size_of::<f32>() * 2 + size_of::<f64>() * 3 + size_of::<u8>();
     pub fn to_bytes(&self) -> [u8; Self::BYTE_SIZE] {
         let mut buffer = [0u8; Self::BYTE_SIZE];
         let mut offset = 0;
@@ -44,6 +47,7 @@ impl ProtectorSeriesItem {
         copy_into_slice(&mut buffer, &mut offset, &self.millivolts.to_le_bytes());
         copy_into_slice(&mut buffer, &mut offset, &self.amps.to_le_bytes());
         copy_into_slice(&mut buffer, &mut offset, &self.watts.to_le_bytes());
+        copy_into_slice(&mut buffer, &mut offset, &(self.vin_status as u8).to_le_bytes());
         buffer
     }
 }
@@ -57,6 +61,7 @@ impl Default for ProtectorSeriesItem {
             millivolts: 0.0,
             amps: 0.0,
             watts: 0.0,
+            vin_status: VinState::Normal,
         }
     }
 }

@@ -9,7 +9,7 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::Io,
+    gpio::{Flex, Io, Level, Pull},
     i2c::I2C,
     peripherals::Peripherals,
     prelude::*,
@@ -42,14 +42,27 @@ async fn main(spawner: Spawner) {
 
     let io: Io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut gpio6 = io.pins.gpio6;
-    gpio6.set_low();
-
     let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
     let timer0 = OneShotTimer::new(systimer.alarm0.into());
     let timers = [timer0];
     let timers = make_static!(timers);
     esp_hal_embassy::init(&clocks, timers);
+
+    let vin_ctl_pin = io.pins.gpio7;
+    let mut vin_ctl_pin = Flex::new(vin_ctl_pin);
+
+    vin_ctl_pin.set_as_open_drain(Pull::None);
+    vin_ctl_pin.set_low();
+
+    log::info!("vin_ctl_pin: {:?}", vin_ctl_pin.get_level());
+
+    if matches!(vin_ctl_pin.get_level(), Level::High) {
+        log::error!("vin_ctl_pin cannot set to low");
+
+        Timer::after_millis(5000).await;
+        return;
+    }
+    vin_ctl_pin.set_as_input(Pull::None);
 
     let timer = PeriodicTimer::new(
         esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks, None)
@@ -95,7 +108,7 @@ async fn main(spawner: Spawner) {
 
     spawner.spawn(mqtt_task(&stack)).ok();
 
-    spawner.spawn(protector::task(i2c_mutex)).ok();
+    spawner.spawn(protector::task(i2c_mutex, vin_ctl_pin)).ok();
 
     spawner.spawn(charge_channel::task(i2c_mutex)).ok();
 

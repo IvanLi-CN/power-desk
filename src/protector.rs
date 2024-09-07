@@ -3,7 +3,11 @@ use embassy_futures::select::{select, Either};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
 use embedded_hal_async::i2c::I2c;
-use esp_hal::{peripherals::I2C0, Async};
+use esp_hal::{
+    gpio::{Flex, Gpio7, Level},
+    peripherals::I2C0,
+    Async,
+};
 use gx21m15::{Gx21m15, Gx21m15Config, OsFailQueueSize};
 use ina226::INA226;
 
@@ -14,6 +18,7 @@ const MAX_FAIL_TIMES: u8 = 3;
 #[embassy_executor::task]
 pub async fn task(
     i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::I2C<'static, I2C0, Async>>,
+    vin_ctl_pin: Flex<'static, Gpio7>,
 ) {
     let i2c_dev = I2cDevice::new(i2c_mutex);
     let sensor_0 = Gx21m15::new(i2c_dev, 0x49);
@@ -22,7 +27,13 @@ pub async fn task(
     let i2c_dev = I2cDevice::new(i2c_mutex);
     let ina226 = INA226::new(i2c_dev, 0x43);
 
-    let mut protector = Protector::new(sensor_0, sensor_1, ina226, &PROTECTOR_SERIES_ITEM_CHANNEL);
+    let mut protector = Protector::new(
+        sensor_0,
+        sensor_1,
+        ina226,
+        vin_ctl_pin,
+        &PROTECTOR_SERIES_ITEM_CHANNEL,
+    );
 
     log::info!("run temperature sensor task...");
 
@@ -78,10 +89,40 @@ impl Default for TemperatureConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum VinState {
+    Normal,
+    Shutdown,
+    Protection,
+}
+
+impl From<VinState> for u8 {
+    fn from(vin_state: VinState) -> Self {
+        match vin_state {
+            VinState::Normal => 0,
+            VinState::Shutdown => 1,
+            VinState::Protection => 2,
+        }
+    }
+}
+
+impl From<u8> for VinState {
+    fn from(vin_state: u8) -> Self {
+        match vin_state {
+            0 => Self::Normal,
+            1 => Self::Shutdown,
+            2 => Self::Protection,
+            _ => unreachable!(),
+        }
+    }
+}
+
 struct Protector<'a, I2C> {
     gx21m15_0: Gx21m15<I2C>,
     gx21m15_1: Gx21m15<I2C>,
     ina226: INA226<I2C>,
+    vin_ctl_pin: Flex<'a, Gpio7>,
     temperature_config: TemperatureConfig,
     temperature_channel: &'a ProtectorSeriesItemChannel,
     current_state: ProtectorSeriesItem,
@@ -96,12 +137,14 @@ where
         gx21m15_0: Gx21m15<I2C>,
         gx21m15_1: Gx21m15<I2C>,
         ina226: INA226<I2C>,
+        vin_ctl_pin: Flex<'a, Gpio7>,
         temperature_channel: &'a ProtectorSeriesItemChannel,
     ) -> Self {
         Self::new_with_config(
             gx21m15_0,
             gx21m15_1,
             ina226,
+            vin_ctl_pin,
             temperature_channel,
             TemperatureConfig::default(),
         )
@@ -111,13 +154,17 @@ where
         gx21m15_0: Gx21m15<I2C>,
         gx21m15_1: Gx21m15<I2C>,
         ina226: INA226<I2C>,
+
+        vin_ctl_pin: Flex<'a, Gpio7>,
         temperature_channel: &'a ProtectorSeriesItemChannel,
         config: TemperatureConfig,
     ) -> Self {
+
         Self {
             gx21m15_0,
             gx21m15_1,
             ina226,
+            vin_ctl_pin,
             temperature_config: config,
             temperature_channel,
             current_state: ProtectorSeriesItem::default(),
@@ -218,6 +265,16 @@ where
                 log::info!("Failed to read input power");
             }
         }
+
+
+        log::info!("get level: {:?}, get output level: {:?}", self.vin_ctl_pin.get_level(), self.vin_ctl_pin.get_output_level());
+        self.current_state.vin_status = if matches!(self.vin_ctl_pin.get_level(), Level::High) {
+            VinState::Normal
+        } else if matches!(self.vin_ctl_pin.get_output_level(), Level::High) {
+            VinState::Protection
+        } else {
+            VinState::Shutdown
+        };
 
         self.temperature_channel.send(self.current_state).await;
 
