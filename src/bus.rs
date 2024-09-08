@@ -47,11 +47,14 @@ impl ProtectorSeriesItem {
         copy_into_slice(&mut buffer, &mut offset, &self.millivolts.to_le_bytes());
         copy_into_slice(&mut buffer, &mut offset, &self.amps.to_le_bytes());
         copy_into_slice(&mut buffer, &mut offset, &self.watts.to_le_bytes());
-        copy_into_slice(&mut buffer, &mut offset, &(self.vin_status as u8).to_le_bytes());
+        copy_into_slice(
+            &mut buffer,
+            &mut offset,
+            &(self.vin_status as u8).to_le_bytes(),
+        );
         buffer
     }
 }
-
 
 impl Default for ProtectorSeriesItem {
     fn default() -> Self {
@@ -66,7 +69,8 @@ impl Default for ProtectorSeriesItem {
     }
 }
 
-pub(crate) type ProtectorSeriesItemChannel = Channel<CriticalSectionRawMutex, ProtectorSeriesItem, 10>;
+pub(crate) type ProtectorSeriesItemChannel =
+    Channel<CriticalSectionRawMutex, ProtectorSeriesItem, 10>;
 
 pub(crate) static PROTECTOR_SERIES_ITEM_CHANNEL: ProtectorSeriesItemChannel = Channel::new();
 
@@ -155,3 +159,5 @@ pub(crate) static CHARGE_CHANNEL_SERIES_ITEM_CHANNELS: [ChargeChannelSeriesItemC
     Channel::new(),
     Channel::new(),
 ];
+
+pub(crate) static VIN_STATUS_CFG_CHANNEL: Channel<CriticalSectionRawMutex, VinState, 1> = Channel::new();

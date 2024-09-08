@@ -263,14 +263,14 @@ where
 
         match self.ina226.shunt_voltage_microvolts().await {
             Ok(value) => {
-                log::info!("Shunt voltage: {}", value);
+                // log::info!("Shunt voltage: {}", value);
             }
             Err(err) => return Err(ChargeChannelError::I2CError(err)),
         };
 
         match self.ina226.current_amps().await {
             Ok(value) => {
-                log::info!("Current: {:?}", value);
+                // log::info!("Current: {:?}", value);
                 if let Some(value) = value {
                     self.current_channel_state.amps = value;
                 }
@@ -280,7 +280,7 @@ where
 
         match self.ina226.power_watts().await {
             Ok(value) => {
-                log::info!("Power: {:?}", value);
+                // log::info!("Power: {:?}", value);
                 if let Some(value) = value {
                     self.current_channel_state.watts = value;
                 }
@@ -346,7 +346,7 @@ where
     async fn report_sw3526_limits(&mut self) -> Result<(), ChargeChannelError<E>> {
         match self.sw3526.get_limit_watts().await {
             Ok(watts) => {
-                log::info!("Limit: {}", watts);
+                // log::info!("Limit: {}", watts);
                 self.current_channel_state.limit_watts = watts;
             }
             Err(err) => {
@@ -366,7 +366,7 @@ where
 
         match self.sw3526.get_buck_output_millivolts().await {
             Ok(millivolts) => {
-                log::info!("Buck output: {}", millivolts,);
+                // log::info!("Buck output: {}", millivolts,);
                 self.current_channel_state.buck_output_millivolts = millivolts;
             }
             Err(err) => {

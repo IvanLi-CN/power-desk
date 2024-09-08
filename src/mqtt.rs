@@ -12,10 +12,12 @@ use static_cell::make_static;
 
 use crate::bus::{
     ChargeChannelSeriesItem, ProtectorSeriesItem, WiFiConnectStatus,
-    CHARGE_CHANNEL_SERIES_ITEM_CHANNELS, PROTECTOR_SERIES_ITEM_CHANNEL, WIFI_CONNECT_STATUS,
+    CHARGE_CHANNEL_SERIES_ITEM_CHANNELS, PROTECTOR_SERIES_ITEM_CHANNEL, VIN_STATUS_CFG_CHANNEL,
+    WIFI_CONNECT_STATUS,
 };
 
 const MQTT_TOPIC_PREFIX: &str = "power-desk/test/";
+const MQTT_CFG_TOPIC_PREFIX: &str = "power-desk/test/cfg/#";
 
 #[embassy_executor::task]
 pub async fn mqtt_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
@@ -27,7 +29,7 @@ pub async fn mqtt_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>
     let mqtt_rx = make_static!([0u8; 128]);
     let socket_tx = make_static!([0u8; 1024]);
     let socket_rx = make_static!([0u8; 1024]);
-    let topics = make_static!(Vec::<&str, 2>::from_slice(&["test/#", "hello"]).unwrap());
+    let topics = make_static!(Vec::<&str, 1>::from_slice(&[MQTT_CFG_TOPIC_PREFIX]).unwrap());
 
     let send_message_buffer: &mut [u8] = make_static!([0u8; 128]);
     let send_topic = make_static!(String::<64>::new());
@@ -98,7 +100,26 @@ pub async fn mqtt_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>
                     ticker.reset();
                     match msg {
                         Ok(msg) => {
-                            log::info!("Received: {:?}", msg);
+                            let (topic_name, message) = msg;
+
+                            if !topic_name.starts_with(
+                                &MQTT_CFG_TOPIC_PREFIX[..MQTT_CFG_TOPIC_PREFIX.len() - 1],
+                            ) {
+                                log::warn!("Invalid topic: {:?}", topic_name);
+                                break;
+                            }
+
+                            let field = &topic_name[(MQTT_CFG_TOPIC_PREFIX.len() - 1)..];
+
+                            match field {
+                                "vin-status" => {
+                                    VIN_STATUS_CFG_CHANNEL.send(message[0].into()).await
+                                }
+                                _ => {
+                                    log::warn!("Invalid field: {:?}", field);
+                                    break;
+                                }
+                            }
                         }
                         Err(mqtt_error) => {
                             log::error!("Other MQTT Error: {:?}", mqtt_error);

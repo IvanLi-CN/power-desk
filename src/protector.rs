@@ -1,17 +1,17 @@
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_futures::select::{select, Either};
+use embassy_futures::select::{select, select3, Either, Either3};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
 use embedded_hal_async::i2c::I2c;
 use esp_hal::{
-    gpio::{Flex, Gpio7, Level},
+    gpio::{Flex, Gpio7, Level, Pull},
     peripherals::I2C0,
     Async,
 };
 use gx21m15::{Gx21m15, Gx21m15Config, OsFailQueueSize};
 use ina226::INA226;
 
-use crate::bus::{ProtectorSeriesItem, ProtectorSeriesItemChannel, PROTECTOR_SERIES_ITEM_CHANNEL};
+use crate::bus::{ProtectorSeriesItem, ProtectorSeriesItemChannel, PROTECTOR_SERIES_ITEM_CHANNEL, VIN_STATUS_CFG_CHANNEL};
 
 const MAX_FAIL_TIMES: u8 = 3;
 
@@ -53,18 +53,28 @@ pub async fn task(
         while fail_times < MAX_FAIL_TIMES {
             ticker.next().await;
 
-            let future = select(ticker.next(), protector.run_task_once()).await;
+            let receive_vin_state_cfg = VIN_STATUS_CFG_CHANNEL.receive();
+
+            let future = select3(ticker.next(), protector.run_task_once(), receive_vin_state_cfg).await;
             match future {
-                Either::First(_) => {
+                Either3::First(_) => {
                     log::warn!("read temperature time out");
                     continue;
                 }
-                Either::Second(res) => match res {
+                Either3::Second(res) => match res {
                     Ok(_) => {}
                     Err(err) => {
                         fail_times += 1;
                         log::warn!("Failed to get temperature#0: {:?}", err);
                         continue;
+                    }
+                },
+                Either3::Third(res) => match res {
+                    VinState::Normal => {
+                        protector.turn_on_vin();
+                    }
+                    _ => {
+                        protector.turn_off_vin();
                     }
                 },
             }
@@ -126,6 +136,7 @@ struct Protector<'a, I2C> {
     temperature_config: TemperatureConfig,
     temperature_channel: &'a ProtectorSeriesItemChannel,
     current_state: ProtectorSeriesItem,
+    shutdown: bool,
 }
 
 impl<'a, I2C, E> Protector<'a, I2C>
@@ -168,6 +179,7 @@ where
             temperature_config: config,
             temperature_channel,
             current_state: ProtectorSeriesItem::default(),
+            shutdown: false,
         }
     }
 
@@ -268,16 +280,32 @@ where
 
 
         log::info!("get level: {:?}, get output level: {:?}", self.vin_ctl_pin.get_level(), self.vin_ctl_pin.get_output_level());
-        self.current_state.vin_status = if matches!(self.vin_ctl_pin.get_level(), Level::High) {
-            VinState::Normal
-        } else if matches!(self.vin_ctl_pin.get_output_level(), Level::High) {
-            VinState::Protection
-        } else {
+        self.current_state.vin_status = if self.shutdown {
             VinState::Shutdown
+        } else if matches!(self.vin_ctl_pin.get_level(), Level::High) {
+            VinState::Normal
+        } else {
+            VinState::Protection
         };
 
         self.temperature_channel.send(self.current_state).await;
 
         Ok(())
     }
+
+    pub fn turn_off_vin(&mut self) {
+        log::info!("turn_off_vin");
+        
+        
+        self.shutdown = true;
+        self.vin_ctl_pin.set_as_open_drain(Pull::None);
+        self.vin_ctl_pin.set_low();
+    }
+
+    pub fn turn_on_vin(&mut self) {
+        log::info!("turn_on_vin");
+        self.shutdown = false;
+        self.vin_ctl_pin.set_as_input(Pull::None);
+    }
+
 }
