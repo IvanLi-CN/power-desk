@@ -261,12 +261,12 @@ where
             Err(err) => return Err(ChargeChannelError::I2CError(err)),
         };
 
-        match self.ina226.shunt_voltage_microvolts().await {
-            Ok(value) => {
-                // log::info!("Shunt voltage: {}", value);
-            }
-            Err(err) => return Err(ChargeChannelError::I2CError(err)),
-        };
+        // match self.ina226.shunt_voltage_microvolts().await {
+        //     Ok(value) => {
+        //         // log::info!("Shunt voltage: {}", value);
+        //     }
+        //     Err(err) => return Err(ChargeChannelError::I2CError(err)),
+        // };
 
         match self.ina226.current_amps().await {
             Ok(value) => {
@@ -437,11 +437,11 @@ macro_rules! do_channel_task {
 
 #[embassy_executor::task]
 pub(crate) async fn task(
-    i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::I2C<'static, I2C0, Async>>,
+    i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::I2c<'static, I2C0, Async>>,
 ) {
     let pca9546a_i2c_dev = I2cDevice::new(i2c_mutex);
     let mux_chip_0: PCA9546A<
-        I2cDevice<CriticalSectionRawMutex, esp_hal::i2c::I2C<'_, I2C0, Async>>,
+        I2cDevice<CriticalSectionRawMutex, esp_hal::i2c::I2c<'_, I2C0, Async>>,
     > = PCA9546A::new(pca9546a_i2c_dev, PCA9546A_ADDRESS_0);
     let pca9546a_i2c_dev = I2cDevice::new(i2c_mutex);
     let mux_chip_1 = PCA9546A::new(pca9546a_i2c_dev, PCA9546A_ADDRESS_1);

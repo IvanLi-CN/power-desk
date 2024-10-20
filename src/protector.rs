@@ -1,29 +1,32 @@
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_futures::select::{select, select3, Either, Either3};
+use embassy_futures::select::{select3, Either3};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
 use embedded_hal_async::i2c::I2c;
 use esp_hal::{
-    gpio::{Flex, Gpio7, Level, Pull},
+    gpio::{AnyPin, Flex, Level, Pull},
     peripherals::I2C0,
     Async,
 };
 use gx21m15::{Gx21m15, Gx21m15Config, OsFailQueueSize};
 use ina226::INA226;
 
-use crate::bus::{ProtectorSeriesItem, ProtectorSeriesItemChannel, PROTECTOR_SERIES_ITEM_CHANNEL, VIN_STATUS_CFG_CHANNEL};
+use crate::bus::{
+    ProtectorSeriesItem, ProtectorSeriesItemChannel, PROTECTOR_SERIES_ITEM_CHANNEL,
+    VIN_STATUS_CFG_CHANNEL,
+};
 
 const MAX_FAIL_TIMES: u8 = 3;
 
 #[embassy_executor::task]
 pub async fn task(
-    i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::I2C<'static, I2C0, Async>>,
-    vin_ctl_pin: Flex<'static, Gpio7>,
+    i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::I2c<'static, I2C0, Async>>,
+    vin_ctl_pin: Flex<'static, AnyPin>,
 ) {
     let i2c_dev = I2cDevice::new(i2c_mutex);
     let sensor_0 = Gx21m15::new(i2c_dev, 0x49);
     let i2c_dev = I2cDevice::new(i2c_mutex);
-    let sensor_1 = Gx21m15::new(i2c_dev, 0x49);
+    let sensor_1 = Gx21m15::new(i2c_dev, 0x48);
     let i2c_dev = I2cDevice::new(i2c_mutex);
     let ina226 = INA226::new(i2c_dev, 0x43);
 
@@ -45,7 +48,7 @@ pub async fn task(
 
         // init
         if let Err(err) = protector.init().await {
-            log::error!("Failed to init protector_1: {:?}", err);
+            log::error!("Failed to init protector: {:?}", err);
             continue;
         }
 
@@ -55,7 +58,12 @@ pub async fn task(
 
             let receive_vin_state_cfg = VIN_STATUS_CFG_CHANNEL.receive();
 
-            let future = select3(ticker.next(), protector.run_task_once(), receive_vin_state_cfg).await;
+            let future = select3(
+                ticker.next(),
+                protector.run_task_once(),
+                receive_vin_state_cfg,
+            )
+            .await;
             match future {
                 Either3::First(_) => {
                     log::warn!("read temperature time out");
@@ -132,7 +140,7 @@ struct Protector<'a, I2C> {
     gx21m15_0: Gx21m15<I2C>,
     gx21m15_1: Gx21m15<I2C>,
     ina226: INA226<I2C>,
-    vin_ctl_pin: Flex<'a, Gpio7>,
+    vin_ctl_pin: Flex<'a, AnyPin>,
     temperature_config: TemperatureConfig,
     temperature_channel: &'a ProtectorSeriesItemChannel,
     current_state: ProtectorSeriesItem,
@@ -148,7 +156,7 @@ where
         gx21m15_0: Gx21m15<I2C>,
         gx21m15_1: Gx21m15<I2C>,
         ina226: INA226<I2C>,
-        vin_ctl_pin: Flex<'a, Gpio7>,
+        vin_ctl_pin: Flex<'a, AnyPin>,
         temperature_channel: &'a ProtectorSeriesItemChannel,
     ) -> Self {
         Self::new_with_config(
@@ -166,11 +174,10 @@ where
         gx21m15_1: Gx21m15<I2C>,
         ina226: INA226<I2C>,
 
-        vin_ctl_pin: Flex<'a, Gpio7>,
+        vin_ctl_pin: Flex<'a, AnyPin>,
         temperature_channel: &'a ProtectorSeriesItemChannel,
         config: TemperatureConfig,
     ) -> Self {
-
         Self {
             gx21m15_0,
             gx21m15_1,
@@ -278,8 +285,11 @@ where
             }
         }
 
-
-        log::info!("get level: {:?}, get output level: {:?}", self.vin_ctl_pin.get_level(), self.vin_ctl_pin.get_output_level());
+        log::info!(
+            "get level: {:?}, get output level: {:?}",
+            self.vin_ctl_pin.get_level(),
+            self.vin_ctl_pin.get_output_level()
+        );
         self.current_state.vin_status = if self.shutdown {
             VinState::Shutdown
         } else if matches!(self.vin_ctl_pin.get_level(), Level::High) {
@@ -295,8 +305,7 @@ where
 
     pub fn turn_off_vin(&mut self) {
         log::info!("turn_off_vin");
-        
-        
+
         self.shutdown = true;
         self.vin_ctl_pin.set_as_open_drain(Pull::None);
         self.vin_ctl_pin.set_low();
@@ -307,5 +316,4 @@ where
         self.shutdown = false;
         self.vin_ctl_pin.set_as_input(Pull::None);
     }
-
 }

@@ -1,22 +1,24 @@
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
+#![feature(impl_trait_in_assoc_type)]
 
 use embassy_executor::Spawner;
-use embassy_net::{Stack, StackResources};
+use embassy_net::{Config, Stack, StackResources};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     gpio::{Flex, Io, Level, Pull},
-    i2c::I2C,
-    peripherals::Peripherals,
+    i2c::I2c,
     prelude::*,
-    system::SystemControl,
-    timer::{OneShotTimer, PeriodicTimer},
+    rng::Rng,
+    timer::{
+        systimer::{SystemTimer, Target},
+        timg::TimerGroup,
+    },
 };
-use esp_wifi::wifi::WifiStaDevice;
+use esp_wifi::{wifi::WifiStaDevice, EspWifiInitFor};
 use mqtt::mqtt_task;
 use static_cell::make_static;
 use wifi::{connection, get_ip_addr, net_task};
@@ -30,23 +32,24 @@ mod mqtt;
 mod protector;
 mod wifi;
 
+extern crate alloc;
+use esp_alloc as _;
+
 #[main]
 async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
 
     log::info!("starting");
 
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    esp_alloc::heap_allocator!(72 * 1024);
+
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io: Io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
-    let timer0 = OneShotTimer::new(systimer.alarm0.into());
-    let timers = [timer0];
-    let timers = make_static!(timers);
-    esp_hal_embassy::init(&clocks, timers);
+    let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+    esp_hal_embassy::init(systimer.alarm0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
 
     let vin_ctl_pin = io.pins.gpio7;
     let mut vin_ctl_pin = Flex::new(vin_ctl_pin);
@@ -64,24 +67,19 @@ async fn main(spawner: Spawner) {
     }
     vin_ctl_pin.set_as_input(Pull::None);
 
-    let timer = PeriodicTimer::new(
-        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks, None)
-            .timer0
-            .into(),
-    );
-    let _init = esp_wifi::initialize(
-        esp_wifi::EspWifiInitFor::Wifi,
-        timer,
-        esp_hal::rng::Rng::new(peripherals.RNG),
+    // Wi-Fi
+
+    let init = esp_wifi::init(
+        EspWifiInitFor::Wifi,
+        timg0.timer0,
+        Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
-
     let wifi = peripherals.WIFI;
     let (wifi_interface, controller) =
-        esp_wifi::wifi::new_with_mode(&_init, wifi, WifiStaDevice).unwrap();
-    let config = embassy_net::Config::dhcpv4(Default::default());
+        esp_wifi::wifi::new_with_mode(&init, wifi, WifiStaDevice).unwrap();
+    let config = Config::dhcpv4(Default::default());
     let seed = 1234; // very random, very secure seed
 
     // Init network stack
@@ -91,14 +89,9 @@ async fn main(spawner: Spawner) {
         make_static!(StackResources::<3>::new()),
         seed
     ));
+
     // Init I2C driver
-    let i2c = I2C::new_async(
-        peripherals.I2C0,
-        io.pins.gpio4,
-        io.pins.gpio5,
-        400u32.kHz(),
-        &clocks,
-    );
+    let i2c = I2c::new_async(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 400u32.kHz());
 
     let i2c_mutex = make_static!(Mutex::<CriticalSectionRawMutex, _>::new(i2c));
 
@@ -113,7 +106,6 @@ async fn main(spawner: Spawner) {
     spawner.spawn(charge_channel::task(i2c_mutex)).ok();
 
     loop {
-        // log::info!("Hello world!");
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }
