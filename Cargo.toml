@@ -21,10 +21,11 @@ esp-println = {version = "0.12.0", features = ["esp32c3", "log"]}
 esp-alloc = {version = "0.5.0"}
 esp-wifi = {version = "0.10.1", features = [
   "esp32c3",
-  "utils",
   "wifi",
+  "ipv4",
   "dhcpv4",
   "embassy-net",
+  "sys-logs",
 ]}
 
 embedded-io = "0.6.1"
