@@ -38,7 +38,7 @@ log = {version = "0.4.22"}
 heapless = {version = "0.8.0", default-features = false}
 
 embassy-embedded-hal = "0.2.0"
-embassy-executor = {version = "0.6.0", features = ["nightly"]}
+embassy-executor = {version = "0.6.3", features = ["nightly"]}
 embassy-net = {version = "0.4.0", features = [
   "dhcpv4",
   "tcp",
@@ -52,7 +52,7 @@ embassy-futures = "0.1.1"
 rust-mqtt = {version = "0.3.0", default-features = false, features = ["log"]}
 static_cell = {version = "2.1.0", features = ["nightly"]}
 
-gx21m15 = {features = ["async"], version = "0.1.0"}
+gx21m15 = {features = ["async"], version = "0.1.1"}
 ina226 = {features = ["async"], version = "0.3.0"}
 pca9546a = {version = "0.1.0", path = "../pca9546a-rs", features = ["async"]}
 sw3526 = {features = ["async"], version = "0.2.1"}
