@@ -4,8 +4,8 @@ runner = "espflash flash --monitor"
 
 [env]
 ESP_LOG="INFO"
-SSID="your_ssid"
-PASSWORD="your_ssid"
+SSID="DevelopmentWiFi"
+PASSWORD="DevPassword123"
 
 [build]
 rustflags = [

@@ -24,6 +24,7 @@ use wifi::{connection, get_ip_addr, net_task};
 
 mod bus;
 mod charge_channel;
+mod config;
 mod error;
 mod helper;
 mod i2c_mux;
