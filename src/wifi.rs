@@ -1,6 +1,7 @@
 use embassy_net::StaticConfigV4;
 
 use crate::bus::{WiFiConnectStatus, WIFI_CONNECT_STATUS};
+use crate::config;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
@@ -9,8 +10,16 @@ use esp_wifi::wifi::{
     WifiState,
 };
 
-const SSID: &str = env!("SSID");
-const PASSWORD: &str = env!("PASSWORD");
+// 获取WiFi配置的函数
+fn get_wifi_credentials() -> (&'static str, &'static str) {
+    match config::get_wifi_config() {
+        (Some(ssid), Some(password)) => (ssid, password),
+        _ => {
+            log::error!("No valid WiFi configuration found!");
+            ("", "") // 返回空字符串作为错误情况
+        }
+    }
+}
 
 // global variable ip address
 pub static NETWORK_CONFIG: Mutex<CriticalSectionRawMutex, Option<StaticConfigV4>> =
@@ -19,8 +28,17 @@ pub static NETWORK_CONFIG: Mutex<CriticalSectionRawMutex, Option<StaticConfigV4>
 #[embassy_executor::task]
 pub async fn connection(mut controller: WifiController<'static>) {
     log::info!("start connection task");
-    log::info!("SSID : {}", SSID);
+
+    let (ssid, password) = get_wifi_credentials();
+    log::info!("SSID : {}", ssid);
     log::info!("Device capabilities: {:?}", controller.capabilities());
+
+    // 检查配置是否有效
+    if ssid.is_empty() || password.is_empty() {
+        log::error!("Invalid WiFi configuration - SSID or password is empty!");
+        return;
+    }
+
     loop {
         match esp_wifi::wifi::wifi_state() {
             WifiState::StaConnected => {
@@ -32,8 +50,8 @@ pub async fn connection(mut controller: WifiController<'static>) {
         }
         if !matches!(controller.is_started(), Ok(true)) {
             let client_config = Configuration::Client(ClientConfiguration {
-                ssid: SSID.try_into().unwrap(),
-                password: PASSWORD.try_into().unwrap(),
+                ssid: ssid.try_into().unwrap(),
+                password: password.try_into().unwrap(),
                 ..Default::default()
             });
             controller.set_configuration(&client_config).unwrap();
