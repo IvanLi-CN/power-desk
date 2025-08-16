@@ -1,5 +1,5 @@
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_futures::select::{select3, Either3};
+use embassy_futures::select::{select, select3, Either, Either3};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
 use embedded_hal_async::i2c::I2c;
@@ -11,6 +11,7 @@ use crate::bus::{
     ProtectorSeriesItem, ProtectorSeriesItemChannel, PROTECTOR_SERIES_ITEM_CHANNEL,
     VIN_STATUS_CFG_CHANNEL,
 };
+use crate::watchdog::{feed_watchdog, WatchedTask};
 
 const MAX_FAIL_TIMES: u8 = 3;
 
@@ -48,37 +49,41 @@ pub async fn task(
             continue;
         }
 
+        // 默认开启输出
+        protector.turn_on_vin();
+
         // run
         while fail_times < MAX_FAIL_TIMES {
             ticker.next().await;
 
-            let receive_vin_state_cfg = VIN_STATUS_CFG_CHANNEL.receive();
+            // 喂看门狗
+            feed_watchdog(WatchedTask::Protector).await;
 
-            let future = select3(
-                ticker.next(),
-                protector.run_task_once(),
-                receive_vin_state_cfg,
-            )
-            .await;
-            match future {
-                Either3::First(_) => {
-                    log::warn!("read temperature time out");
-                    continue;
-                }
-                Either3::Second(res) => match res {
-                    Ok(_) => {}
-                    Err(err) => {
-                        fail_times += 1;
-                        log::warn!("Failed to get temperature#0: {:?}", err);
-                        continue;
-                    }
-                },
-                Either3::Third(res) => match res {
+            // 检查是否有MQTT控制命令（非阻塞）
+            if let Ok(vin_state) = VIN_STATUS_CFG_CHANNEL.try_receive() {
+                match vin_state {
                     VinState::Normal => {
                         protector.turn_on_vin();
                     }
                     _ => {
                         protector.turn_off_vin();
+                    }
+                }
+            }
+
+            // 执行温度监控任务（带超时）
+            let future = select(ticker.next(), protector.run_task_once()).await;
+            match future {
+                Either::First(_) => {
+                    log::warn!("read temperature time out");
+                    continue;
+                }
+                Either::Second(res) => match res {
+                    Ok(_) => {}
+                    Err(err) => {
+                        fail_times += 1;
+                        log::warn!("Failed to get temperature#0: {:?}", err);
+                        continue;
                     }
                 },
             }
