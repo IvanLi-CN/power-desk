@@ -4,7 +4,7 @@ use embassy_futures::select::{self, select};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
 use embedded_hal_async::i2c::{I2c, SevenBitAddress};
-use esp_hal::{peripherals::I2C0, Async};
+// Removed unused imports: peripherals::I2C0, Async
 use ina226::INA226;
 use pca9546a::PCA9546A;
 use sw3526::{FastChargeConfig1, SW3526};
@@ -437,11 +437,11 @@ macro_rules! do_channel_task {
 
 #[embassy_executor::task]
 pub(crate) async fn task(
-    i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::I2c<'static, I2C0, Async>>,
+    i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::master::I2c<'static, esp_hal::Async>>,
 ) {
     let pca9546a_i2c_dev = I2cDevice::new(i2c_mutex);
     let mux_chip_0: PCA9546A<
-        I2cDevice<CriticalSectionRawMutex, esp_hal::i2c::I2c<'_, I2C0, Async>>,
+        I2cDevice<CriticalSectionRawMutex, esp_hal::i2c::master::I2c<'_, esp_hal::Async>>,
     > = PCA9546A::new(pca9546a_i2c_dev, PCA9546A_ADDRESS_0);
     let pca9546a_i2c_dev = I2cDevice::new(i2c_mutex);
     let mux_chip_1 = PCA9546A::new(pca9546a_i2c_dev, PCA9546A_ADDRESS_1);

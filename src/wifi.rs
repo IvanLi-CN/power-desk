@@ -1,11 +1,11 @@
-use embassy_net::{Stack, StaticConfigV4};
+use embassy_net::StaticConfigV4;
 
 use crate::bus::{WiFiConnectStatus, WIFI_CONNECT_STATUS};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_wifi::wifi::{
-    ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiStaDevice,
+    ClientConfiguration, Configuration, WifiController, WifiEvent,
     WifiState,
 };
 
@@ -20,9 +20,9 @@ pub static NETWORK_CONFIG: Mutex<CriticalSectionRawMutex, Option<StaticConfigV4>
 pub async fn connection(mut controller: WifiController<'static>) {
     log::info!("start connection task");
     log::info!("SSID : {}", SSID);
-    log::info!("Device capabilities: {:?}", controller.get_capabilities());
+    log::info!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_wifi::wifi::get_wifi_state() {
+        match esp_wifi::wifi::wifi_state() {
             WifiState::StaConnected => {
                 // wait until we're no longer connected
                 controller.wait_for_event(WifiEvent::StaDisconnected).await;
@@ -38,12 +38,12 @@ pub async fn connection(mut controller: WifiController<'static>) {
             });
             controller.set_configuration(&client_config).unwrap();
             log::info!("Starting wifi");
-            controller.start().await.unwrap();
+            controller.start().unwrap();
             log::info!("Wifi started!");
         }
         log::info!("About to connect...");
 
-        match controller.connect().await {
+        match controller.connect() {
             Ok(_) => log::info!("Wifi connected!"),
             Err(e) => {
                 log::info!("Failed to connect to wifi: {e:?}");
@@ -54,7 +54,7 @@ pub async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-pub async fn get_ip_addr(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
+pub async fn get_ip_addr(stack: &'static embassy_net::Stack<'static>) {
     loop {
         let mut network_config_guard = NETWORK_CONFIG.lock().await;
         if stack.is_link_up() && network_config_guard.is_none() {
@@ -87,6 +87,6 @@ pub async fn get_ip_addr(stack: &'static Stack<WifiDevice<'static, WifiStaDevice
 }
 
 #[embassy_executor::task]
-pub async fn net_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
-    stack.run().await
+pub async fn net_task(runner: &'static mut embassy_net::Runner<'static, esp_wifi::wifi::WifiDevice<'static>>) {
+    runner.run().await
 }
