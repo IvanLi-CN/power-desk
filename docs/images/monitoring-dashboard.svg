@@ -1,0 +1,52 @@
+<svg width="800" height="280" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280">
+  <defs>
+    <linearGradient id="dashGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2c3e50;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#34495e;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#00000020"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="280" fill="#ecf0f1" rx="8"/>
+
+  <!-- Dashboard Header -->
+  <rect x="40" y="30" width="720" height="220" rx="15" fill="url(#dashGrad)" filter="url(#shadow)"/>
+  <text x="400" y="60" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="22" font-weight="600" fill="white">Power Desk Monitoring Dashboard</text>
+
+  <!-- Temperature Monitor -->
+  <rect x="70" y="80" width="140" height="90" rx="8" fill="white" opacity="0.95" filter="url(#shadow)"/>
+  <text x="140" y="105" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="600" fill="#2c3e50">Temperature</text>
+  <text x="140" y="125" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="500" fill="#27ae60">45.2°C / 46.8°C</text>
+  <text x="140" y="145" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#7f8c8d">Normal Range</text>
+  <text x="140" y="160" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#7f8c8d">&lt; 60°C</text>
+
+  <!-- Voltage/Current Monitor -->
+  <rect x="230" y="80" width="140" height="90" rx="8" fill="white" opacity="0.95" filter="url(#shadow)"/>
+  <text x="300" y="105" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="600" fill="#2c3e50">V/I Monitor</text>
+  <text x="300" y="125" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="500" fill="#3498db">12.05V</text>
+  <text x="300" y="142" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="500" fill="#e67e22">2.34A</text>
+  <text x="300" y="159" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="500" fill="#9b59b6">28.2W</text>
+
+  <!-- VIN Status -->
+  <rect x="390" y="80" width="140" height="90" rx="8" fill="white" opacity="0.95" filter="url(#shadow)"/>
+  <text x="460" y="105" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="600" fill="#2c3e50">Output Status</text>
+  <circle cx="460" cy="130" r="12" fill="#27ae60"/>
+  <text x="460" y="135" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="600" fill="white">ON</text>
+  <text x="460" y="155" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="500" fill="#27ae60">Normal</text>
+
+  <!-- Watchdog Status -->
+  <rect x="550" y="80" width="140" height="90" rx="8" fill="white" opacity="0.95" filter="url(#shadow)"/>
+  <text x="620" y="105" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="600" fill="#2c3e50">Watchdog</text>
+  <text x="620" y="125" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#34495e">Protector: 21ms</text>
+  <text x="620" y="142" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#34495e">ChargeChannel: 22ms</text>
+  <text x="620" y="159" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="500" fill="#27ae60">Running Normal</text>
+
+  <!-- Status Indicators -->
+  <circle cx="85" cy="95" r="3" fill="#27ae60"/>
+  <circle cx="245" cy="95" r="3" fill="#3498db"/>
+  <circle cx="405" cy="95" r="3" fill="#27ae60"/>
+  <circle cx="565" cy="95" r="3" fill="#27ae60"/>
+</svg>

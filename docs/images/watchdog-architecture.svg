@@ -1,0 +1,68 @@
+<svg width="800" height="350" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 350">
+  <defs>
+    <linearGradient id="watchdogGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8e44ad;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#9b59b6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="taskGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3498db;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5dade2;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#00000020"/>
+    </filter>
+    <marker id="feedArrow" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#27ae60"/>
+    </marker>
+    <marker id="restartArrow" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#e74c3c"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="350" fill="#f8f9fa" rx="8"/>
+
+  <!-- Watchdog Core -->
+  <circle cx="400" cy="175" r="70" fill="url(#watchdogGrad)" filter="url(#shadow)"/>
+  <text x="400" y="165" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="16" font-weight="600" fill="white">Watchdog</text>
+  <text x="400" y="185" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">Monitor Center</text>
+  <text x="400" y="200" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="white">2s Timeout</text>
+
+  <!-- Protector Task -->
+  <rect x="80" y="60" width="140" height="90" rx="12" fill="url(#taskGrad)" filter="url(#shadow)"/>
+  <text x="150" y="85" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="15" font-weight="600" fill="white">Protector</text>
+  <text x="150" y="105" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="white">• Temperature Monitor</text>
+  <text x="150" y="122" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="white">• Voltage Monitor</text>
+  <text x="150" y="139" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="white">• Output Control</text>
+
+  <!-- ChargeChannel Task -->
+  <rect x="80" y="200" width="140" height="90" rx="12" fill="url(#taskGrad)" filter="url(#shadow)"/>
+  <text x="150" y="225" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="15" font-weight="600" fill="white">ChargeChannel</text>
+  <text x="150" y="245" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="white">• Charge Management</text>
+  <text x="150" y="262" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="white">• Channel Control</text>
+  <text x="150" y="279" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="white">• Status Monitor</text>
+
+  <!-- System Restart -->
+  <rect x="580" y="130" width="140" height="90" rx="12" fill="#e74c3c" filter="url(#shadow)"/>
+  <text x="650" y="155" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="15" font-weight="600" fill="white">System Restart</text>
+  <text x="650" y="175" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="white">• Timeout Detection</text>
+  <text x="650" y="192" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="white">• Fault Recovery</text>
+  <text x="650" y="209" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="white">• Smart Backoff</text>
+
+  <!-- Feed Signals -->
+  <path d="M 220 105 Q 310 105 330 145" stroke="#27ae60" stroke-width="4" fill="none" marker-end="url(#feedArrow)"/>
+  <path d="M 220 245 Q 310 245 330 205" stroke="#27ae60" stroke-width="4" fill="none" marker-end="url(#feedArrow)"/>
+
+  <!-- Restart Signal -->
+  <path d="M 470 175 L 580 175" stroke="#e74c3c" stroke-width="4" marker-end="url(#restartArrow)"/>
+
+  <!-- Labels -->
+  <text x="275" y="95" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="500" fill="#27ae60">Feed Signal</text>
+  <text x="275" y="235" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="500" fill="#27ae60">Feed Signal</text>
+  <text x="525" y="165" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="500" fill="#e74c3c">Timeout</text>
+
+  <!-- Timer Indicator -->
+  <rect x="370" y="30" width="60" height="25" rx="6" fill="#f39c12" filter="url(#shadow)"/>
+  <text x="400" y="47" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="600" fill="white">500ms</text>
+  <text x="400" y="20" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#7f8c8d">Check Interval</text>
+</svg>

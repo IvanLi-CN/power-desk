@@ -30,6 +30,7 @@ mod helper;
 mod i2c_mux;
 mod mqtt;
 mod protector;
+mod watchdog;
 mod wifi;
 
 extern crate alloc;
@@ -113,6 +114,9 @@ async fn main(spawner: Spawner) {
     spawner.spawn(protector::task(i2c_mutex, vin_ctl_pin)).ok();
 
     spawner.spawn(charge_channel::task(i2c_mutex)).ok();
+
+    // 启动看门狗，超时时间设置为2秒
+    watchdog::start_watchdog(&spawner, 2000).await.ok();
 
     loop {
         Timer::after(Duration::from_millis(5_000)).await;

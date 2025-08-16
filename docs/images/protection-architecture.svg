@@ -1,0 +1,60 @@
+<svg width="900" height="280" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 280">
+  <defs>
+    <linearGradient id="hardwareGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e74c3c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c0392b;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="softwareGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1abc9c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16a085;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="systemGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3498db;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2980b9;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="4" stdDeviation="4" flood-color="#00000020"/>
+    </filter>
+    <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#34495e"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="280" fill="#f8f9fa" rx="8"/>
+
+  <!-- Hardware Layer -->
+  <rect x="60" y="40" width="220" height="200" rx="12" fill="url(#hardwareGrad)" filter="url(#shadow)"/>
+  <text x="170" y="70" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="600" fill="white">Hardware Layer</text>
+  <line x1="80" y1="85" x2="260" y2="85" stroke="white" stroke-width="2" opacity="0.8"/>
+  <text x="90" y="110" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• Temperature Sensors</text>
+  <text x="90" y="135" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• Current Detection</text>
+  <text x="90" y="160" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• Power Limiting</text>
+  <text x="90" y="185" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• GPIO Control</text>
+
+  <!-- Software Layer -->
+  <rect x="340" y="40" width="220" height="200" rx="12" fill="url(#softwareGrad)" filter="url(#shadow)"/>
+  <text x="450" y="70" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="600" fill="white">Software Layer</text>
+  <line x1="360" y1="85" x2="540" y2="85" stroke="white" stroke-width="2" opacity="0.8"/>
+  <text x="370" y="110" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• Data Monitoring</text>
+  <text x="370" y="135" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• Communication</text>
+  <text x="370" y="160" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• State Management</text>
+  <text x="370" y="185" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• Remote Control</text>
+
+  <!-- System Layer -->
+  <rect x="620" y="40" width="220" height="200" rx="12" fill="url(#systemGrad)" filter="url(#shadow)"/>
+  <text x="730" y="70" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="600" fill="white">System Layer</text>
+  <line x1="640" y1="85" x2="820" y2="85" stroke="white" stroke-width="2" opacity="0.8"/>
+  <text x="650" y="110" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• Watchdog Monitor</text>
+  <text x="650" y="135" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• Task Protection</text>
+  <text x="650" y="160" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• Fault Recovery</text>
+  <text x="650" y="185" font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="white">• Smart Restart</text>
+
+  <!-- Connection Arrows -->
+  <path d="M 280 140 Q 310 140 340 140" stroke="#34495e" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M 560 140 Q 590 140 620 140" stroke="#34495e" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- Flow Labels -->
+  <text x="310" y="125" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#7f8c8d">Data Flow</text>
+  <text x="590" y="125" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#7f8c8d">Control Flow</text>
+</svg>

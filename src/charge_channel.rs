@@ -16,6 +16,7 @@ use crate::{
     },
     error::ChargeChannelError,
     i2c_mux::{ChargeChannelIndex, I2cMux},
+    watchdog::{feed_watchdog, WatchedTask},
 };
 
 const PCA9546A_ADDRESS_0: SevenBitAddress = 0x70;
@@ -475,6 +476,9 @@ pub(crate) async fn task(
 
         loop {
             ticker.next().await;
+
+            // 喂看门狗
+            feed_watchdog(WatchedTask::ChargeChannel).await;
 
             do_channel_task!(
                 mux,

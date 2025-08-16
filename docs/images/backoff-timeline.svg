@@ -1,0 +1,41 @@
+<svg width="600" height="300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="timelineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4CAF50;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#FFC107;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F44336;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 时间轴 -->
+  <rect x="50" y="150" width="500" height="20" fill="url(#timelineGrad)" rx="10"/>
+  
+  <!-- 时间刻度 -->
+  <line x1="50" y1="140" x2="50" y2="180" stroke="#333" stroke-width="2"/>
+  <line x1="200" y1="140" x2="200" y2="180" stroke="#333" stroke-width="2"/>
+  <line x1="350" y1="140" x2="350" y2="180" stroke="#333" stroke-width="2"/>
+  <line x1="450" y1="140" x2="450" y2="180" stroke="#333" stroke-width="2"/>
+  <line x1="550" y1="140" x2="550" y2="180" stroke="#333" stroke-width="2"/>
+  
+  <!-- 时间标签 -->
+  <text x="50" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="12">0s</text>
+  <text x="200" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="12">2s</text>
+  <text x="350" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="12">4s</text>
+  <text x="450" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="12">6s</text>
+  <text x="550" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="12">10s</text>
+  
+  <!-- 状态标签 -->
+  <text x="125" y="120" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#4CAF50">正常运行</text>
+  <text x="275" y="120" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#FFC107">超时警告</text>
+  <text x="500" y="120" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#F44336">触发重启</text>
+  
+  <!-- 动态调整说明 -->
+  <rect x="50" y="230" width="500" height="60" rx="10" fill="#E8F5E8" stroke="#4CAF50" stroke-width="2"/>
+  <text x="300" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#2E7D32">智能退避机制</text>
+  <text x="300" y="270" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#333">• 连续重启5次后启动30秒退避期</text>
+  <text x="300" y="285" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#333">• 超时时间动态调整：2秒 → 4秒 → 6秒 → 8秒 → 10秒</text>
+  
+  <!-- 重启指示器 -->
+  <polygon points="200,130 210,140 200,150 190,140" fill="#F44336"/>
+  <text x="200" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#F44336">首次超时</text>
+</svg>
