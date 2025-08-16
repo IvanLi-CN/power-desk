@@ -13,7 +13,7 @@ rustflags = [
   # NOTE: May negatively impact performance of produced code
   "-C", "force-frame-pointers",
   "-C", "link-arg=-Tlinkall.x",
-  "-C", "link-arg=-Trom_functions.x",
+  # "-C", "link-arg=-Trom_functions.x", # Not needed in esp-hal 1.0.0-beta.1
 ]
 
 target = "riscv32imc-unknown-none-elf"

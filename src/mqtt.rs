@@ -1,7 +1,7 @@
 use embassy_futures::select::{select, select3, select4, Either, Either3, Either4};
-use embassy_net::{tcp::TcpSocket, IpAddress, IpEndpoint, Stack};
+use embassy_net::{tcp::TcpSocket, IpAddress, IpEndpoint};
 use embassy_time::{Duration, Ticker, Timer};
-use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
+// WifiStaDevice no longer exists in esp-wifi 0.14.1
 use heapless::{String, Vec};
 use rust_mqtt::{
     client::{client::MqttClient, client_config::ClientConfig},
@@ -20,7 +20,7 @@ const MQTT_TOPIC_PREFIX: &str = "power-desk/test/";
 const MQTT_CFG_TOPIC_PREFIX: &str = "power-desk/test/cfg/#";
 
 #[embassy_executor::task]
-pub async fn mqtt_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
+pub async fn mqtt_task(stack: &'static embassy_net::Stack<'static>) {
     waiting_wifi_connected().await;
 
     log::info!("start mqtt task");
@@ -41,7 +41,7 @@ pub async fn mqtt_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>
 
         let remote_endpoint = IpEndpoint::new(address, 1883);
 
-        let mut socket = TcpSocket::new(&stack, socket_rx, socket_tx);
+        let mut socket = TcpSocket::new(*stack, socket_rx, socket_tx);
         socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
         socket
