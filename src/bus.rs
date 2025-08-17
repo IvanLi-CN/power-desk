@@ -32,7 +32,7 @@ pub(crate) struct ProtectorSeriesItem {
 
 impl ProtectorSeriesItem {
     const BYTE_SIZE: usize = size_of::<f32>() * 2 + size_of::<f64>() * 3 + size_of::<u8>();
-    pub fn to_bytes(&self) -> [u8; Self::BYTE_SIZE] {
+    pub fn to_bytes(self) -> [u8; Self::BYTE_SIZE] {
         let mut buffer = [0u8; Self::BYTE_SIZE];
         let mut offset = 0;
 
@@ -95,7 +95,7 @@ impl ChargeChannelSeriesItem {
         + size_of::<u16>() * 2
         + size_of::<u8>();
 
-    pub fn to_bytes(&self) -> [u8; Self::BYTE_SIZE] {
+    pub fn to_bytes(self) -> [u8; Self::BYTE_SIZE] {
         let mut buffer = [0u8; Self::BYTE_SIZE];
         let mut offset = 0;
 

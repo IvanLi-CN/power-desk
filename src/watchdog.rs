@@ -67,7 +67,7 @@ impl WatchdogState {
             WatchedTask::Protector => self.protector_status.feed(),
             WatchedTask::ChargeChannel => self.charge_channel_status.feed(),
         }
-        log::debug!("Watchdog: Task {:?} fed", task);
+        log::debug!("Watchdog: Task {task:?} fed");
     }
 
     fn check_timeouts(&mut self) -> Option<WatchedTask> {
@@ -116,9 +116,8 @@ impl WatchdogState {
         // 动态调整超时时间
         if self.consecutive_restarts > 2 {
             let multiplier = (self.consecutive_restarts - 1).min(5); // 最多5倍
-            self.timeout_duration = Duration::from_millis(
-                self.base_timeout_duration.as_millis() as u64 * multiplier as u64,
-            );
+            self.timeout_duration =
+                Duration::from_millis(self.base_timeout_duration.as_millis() * multiplier as u64);
             log::warn!(
                 "Watchdog: Increased timeout to {}ms due to {} consecutive restarts",
                 self.timeout_duration.as_millis(),
@@ -160,7 +159,7 @@ pub async fn init_watchdog(timeout_ms: u64) {
 
     WATCHDOG_STATE.lock().await.replace(state);
 
-    log::info!("Watchdog initialized with timeout: {}ms", timeout_ms);
+    log::info!("Watchdog initialized with timeout: {timeout_ms}ms");
 }
 
 /// 喂狗函数 - 由被监控的任务调用
@@ -181,11 +180,9 @@ async fn check_watchdog_timeouts() -> Option<WatchedTask> {
 
 /// 获取看门狗状态信息
 async fn get_watchdog_status() -> Option<String<256>> {
-    if let Some(ref state) = *WATCHDOG_STATE.lock().await {
-        Some(state.get_status_info())
-    } else {
-        None
-    }
+    (*WATCHDOG_STATE.lock().await)
+        .as_ref()
+        .map(|state| state.get_status_info())
 }
 
 /// 记录重启事件
@@ -229,7 +226,7 @@ pub async fn watchdog_task() {
 
         // 检查是否有任务超时
         if let Some(timeout_task) = check_watchdog_timeouts().await {
-            log::error!("Watchdog timeout detected for task: {:?}", timeout_task);
+            log::error!("Watchdog timeout detected for task: {timeout_task:?}");
 
             // 记录重启
             record_restart().await;
@@ -253,7 +250,7 @@ pub async fn watchdog_task() {
             }
 
             // 如果系统运行稳定超过60秒，重置重启计数器
-            if status_report_counter % 120 == 0 {
+            if status_report_counter.is_multiple_of(120) {
                 // 120 * 500ms = 60s
                 reset_restart_counter().await;
             }

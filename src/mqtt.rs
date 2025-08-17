@@ -64,7 +64,7 @@ pub async fn mqtt_task(stack: &'static embassy_net::Stack<'static>) {
                 log::info!("Connected");
             }
             Err(err) => {
-                log::error!("Cannot connect: {:?}", err);
+                log::error!("Cannot connect: {err:?}");
                 Timer::after_millis(1000).await;
                 continue;
             }
@@ -75,7 +75,7 @@ pub async fn mqtt_task(stack: &'static embassy_net::Stack<'static>) {
                 log::info!("Subscribed");
             }
             Err(err) => {
-                log::error!("Cannot subscribe: {:?}", err);
+                log::error!("Cannot subscribe: {err:?}");
                 Timer::after_millis(1000).await;
                 continue;
             }
@@ -105,7 +105,7 @@ pub async fn mqtt_task(stack: &'static embassy_net::Stack<'static>) {
                             if !topic_name.starts_with(
                                 &MQTT_CFG_TOPIC_PREFIX[..MQTT_CFG_TOPIC_PREFIX.len() - 1],
                             ) {
-                                log::warn!("Invalid topic: {:?}", topic_name);
+                                log::warn!("Invalid topic: {topic_name:?}");
                                 break;
                             }
 
@@ -116,22 +116,22 @@ pub async fn mqtt_task(stack: &'static embassy_net::Stack<'static>) {
                                     VIN_STATUS_CFG_CHANNEL.send(message[0].into()).await
                                 }
                                 _ => {
-                                    log::warn!("Invalid field: {:?}", field);
+                                    log::warn!("Invalid field: {field:?}");
                                     break;
                                 }
                             }
                         }
                         Err(mqtt_error) => {
-                            log::error!("Other MQTT Error: {:?}", mqtt_error);
+                            log::error!("Other MQTT Error: {mqtt_error:?}");
                             break;
                         }
                     };
                 }
                 Either3::Third((topic_name, message, qos, retain)) => {
-                    match client.send_message(topic_name, &message, qos, retain).await {
+                    match client.send_message(topic_name, message, qos, retain).await {
                         Ok(_) => {}
                         Err(err) => {
-                            log::error!("Send error: {:?}", err);
+                            log::error!("Send error: {err:?}");
 
                             if matches!(err, ReasonCode::NoMatchingSubscribers) {
                                 continue;

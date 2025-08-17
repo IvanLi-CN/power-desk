@@ -48,7 +48,7 @@ pub async fn task(
 
         // init
         if let Err(err) = protector.init().await {
-            log::error!("Failed to init protector: {:?}", err);
+            log::error!("Failed to init protector: {err:?}");
             continue;
         }
 
@@ -85,7 +85,7 @@ pub async fn task(
                     Ok(_) => {}
                     Err(err) => {
                         fail_times += 1;
-                        log::warn!("Failed to get temperature#0: {:?}", err);
+                        log::warn!("Failed to get temperature#0: {err:?}");
                         continue;
                     }
                 },

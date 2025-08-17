@@ -27,7 +27,7 @@ pub async fn connection(mut controller: WifiController<'static>) {
     log::info!("start connection task");
 
     let (ssid, password) = get_wifi_credentials();
-    log::info!("SSID : {}", ssid);
+    log::info!("SSID : {ssid}");
     log::info!("Device capabilities: {:?}", controller.capabilities());
 
     // 检查配置是否有效
@@ -37,13 +37,10 @@ pub async fn connection(mut controller: WifiController<'static>) {
     }
 
     loop {
-        match esp_wifi::wifi::wifi_state() {
-            WifiState::StaConnected => {
-                // wait until we're no longer connected
-                controller.wait_for_event(WifiEvent::StaDisconnected).await;
-                Timer::after(Duration::from_millis(5000)).await
-            }
-            _ => {}
+        if esp_wifi::wifi::wifi_state() == WifiState::StaConnected {
+            // wait until we're no longer connected
+            controller.wait_for_event(WifiEvent::StaDisconnected).await;
+            Timer::after(Duration::from_millis(5000)).await
         }
         if !matches!(controller.is_started(), Ok(true)) {
             let client_config = Configuration::Client(ClientConfiguration {

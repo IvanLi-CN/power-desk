@@ -67,7 +67,7 @@ impl WifiConfig {
     pub fn get_ssid(&self) -> Result<&str, str::Utf8Error> {
         let len = self.ssid_len as usize;
         if len > 32 {
-            return Err(str::Utf8Error::from(core::str::from_utf8(&[]).unwrap_err()));
+            return Err(core::str::from_utf8(&[]).unwrap_err());
         }
         str::from_utf8(&self.ssid[..len])
     }
@@ -76,7 +76,7 @@ impl WifiConfig {
     pub fn get_password(&self) -> Result<&str, str::Utf8Error> {
         let len = self.password_len as usize;
         if len > 64 {
-            return Err(str::Utf8Error::from(core::str::from_utf8(&[]).unwrap_err()));
+            return Err(core::str::from_utf8(&[]).unwrap_err());
         }
         str::from_utf8(&self.password[..len])
     }

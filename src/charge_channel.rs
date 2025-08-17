@@ -160,7 +160,7 @@ where
         match self.sw3526.get_chip_version().await {
             Ok(value) => {
                 self.online_status |= ChargeChannelOnlineStatus::SW3526Online;
-                log::info!("sw3526 Chip version: {}", value);
+                log::info!("sw3526 Chip version: {value}");
 
                 self.sw3526
                     .set_i2c_writable()
@@ -199,7 +199,7 @@ where
                 log::info!("SW3526 init success");
             }
             Err(err) => {
-                log::error!("SW3526 init error. {:?}", err);
+                log::error!("SW3526 init error. {err:?}");
                 return Err(err);
             }
         }
@@ -209,7 +209,7 @@ where
                 log::info!("INA226 init success");
             }
             Err(err) => {
-                log::error!("INA226 init error. {:?}", err);
+                log::error!("INA226 init error. {err:?}");
                 return Err(err);
             }
         }

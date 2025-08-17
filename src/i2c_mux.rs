@@ -36,10 +36,7 @@ where
         }
         #[cfg(not(no_mux_0))]
         {
-            self.mux_0_online = match self.mux_0.get_channel().await {
-                Ok(_) => true,
-                Err(_) => false,
-            };
+            self.mux_0_online = (self.mux_0.get_channel().await).is_ok();
         }
 
         #[cfg(no_mux_1)]
@@ -48,10 +45,7 @@ where
         }
         #[cfg(not(no_mux_1))]
         {
-            self.mux_1_online = match self.mux_1.get_channel().await {
-                Ok(_) => true,
-                Err(_) => false,
-            };
+            self.mux_1_online = (self.mux_1.get_channel().await).is_ok();
         }
     }
 
