@@ -361,14 +361,26 @@ async function loadVersions() {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             const branches = await response.json();
-            versions = branches.map(branch => ({
-                name: branch.name,
-                value: branch.name,
-                downloadUrl: `https://github.com/IvanLi-CN/power-desk/archive/${branch.name}.zip`,
-                firmwareUrl: branch.name === 'main' ?
-                    'https://github.com/IvanLi-CN/power-desk/releases/download/dev-latest/power-desk-dev-latest.bin' :
-                    null
-            }));
+            // For branches, we'll add the main branch with dev firmware
+            versions = [];
+            if (branches.find(b => b.name === 'main')) {
+                versions.push({
+                    name: 'main (latest development)',
+                    value: 'main',
+                    downloadUrl: 'https://github.com/IvanLi-CN/power-desk/archive/main.zip',
+                    firmwareUrl: 'https://github.com/IvanLi-CN/power-desk/releases/download/dev-latest/power-desk-dev-latest.bin'
+                });
+            }
+
+            // Add other branches without firmware
+            branches.filter(b => b.name !== 'main').forEach(branch => {
+                versions.push({
+                    name: branch.name,
+                    value: branch.name,
+                    downloadUrl: `https://github.com/IvanLi-CN/power-desk/archive/${branch.name}.zip`,
+                    firmwareUrl: null
+                });
+            });
         }
 
         // 更新选择框
