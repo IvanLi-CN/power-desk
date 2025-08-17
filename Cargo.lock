@@ -1110,7 +1110,8 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pca9546a"
-version = "0.1.0"
+version = "0.0.0"
+source = "git+https://github.com/IvanLi-CN/pca9546a-rs#ea81def7daddbaefff077759370b953049407c37"
 dependencies = [
  "embedded-hal 1.0.0",
  "embedded-hal-async",

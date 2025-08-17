@@ -204,4 +204,3 @@ jobs:
             After flashing, you can configure WiFi using the [web configuration tool](https://github.com/IvanLi-CN/power-desk/tree/main/web-config-tool).
           draft: false
           prerelease: true
-          make_latest: "false"

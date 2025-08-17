@@ -55,7 +55,7 @@ static_cell = { version = "2.1.0", features = ["nightly"] }
 
 gx21m15 = {features = ["async"], version = "0.1.1"}
 ina226 = {features = ["async"], version = "0.3.0"}
-pca9546a = {version = "0.1.0", path = "../pca9546a-rs", features = ["async"]}
+pca9546a = {git = "https://github.com/IvanLi-CN/pca9546a-rs", features = ["async"]}
 sw3526 = {features = ["async"], version = "0.2.1"}
 
 [profile.dev]
