@@ -17,6 +17,10 @@ env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   build-firmware:
     name: Build ESP32-C3 Firmware
@@ -30,17 +34,23 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf
-          toolchain: nightly-2024-06-12
+          toolchain: nightly
           components: rust-src
           
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
         
       - name: Install espflash
-        run: cargo install espflash
+        run: |
+          cargo install espflash --locked
+          espflash --version
         
       - name: Build firmware
-        run: cargo build --release
+        run: |
+          echo "Building firmware..."
+          cargo build --release --verbose
+          echo "Build completed. Checking output..."
+          ls -la target/riscv32imc-unknown-none-elf/release/
         
       - name: Generate firmware binary
         run: |
@@ -115,17 +125,23 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf
-          toolchain: nightly-2024-06-12
+          toolchain: nightly
           components: rust-src
           
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
         
       - name: Install espflash
-        run: cargo install espflash
+        run: |
+          cargo install espflash --locked
+          espflash --version
         
       - name: Build firmware
-        run: cargo build --release
+        run: |
+          echo "Building firmware..."
+          cargo build --release --verbose
+          echo "Build completed. Checking output..."
+          ls -la target/riscv32imc-unknown-none-elf/release/
         
       - name: Generate firmware binary
         run: |
