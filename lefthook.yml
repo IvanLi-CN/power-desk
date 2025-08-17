@@ -1,0 +1,38 @@
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      glob: "*.{rs}"
+      run: cargo fmt --all
+      stage_fixed: true
+    clippy:
+      glob: "*.{rs}"
+      run: cargo clippy --target riscv32imc-unknown-none-elf --all-features --workspace
+    check:
+      glob: "*.{rs}"
+      run: cargo check --target riscv32imc-unknown-none-elf --all-features
+    markdown-lint:
+      glob: "**/*.md"
+      run: |
+        if command -v markdownlint-cli2 >/dev/null 2>&1; then
+          markdownlint-cli2 {staged_files}
+        elif command -v bunx >/dev/null 2>&1; then
+          bunx markdownlint-cli2 {staged_files}
+        else
+          echo "Warning: markdownlint-cli2 not found, skipping markdown lint"
+        fi
+      stage_fixed: true
+
+commit-msg:
+  commands:
+    commitlint:
+      run: |
+        if command -v commitlint >/dev/null 2>&1; then
+          commitlint --edit {1}
+        elif command -v bunx >/dev/null 2>&1; then
+          bunx commitlint --edit {1}
+        elif command -v npx >/dev/null 2>&1; then
+          npx commitlint --edit {1}
+        else
+          echo "Warning: commitlint not found, skipping commit message validation"
+        fi

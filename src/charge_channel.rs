@@ -241,7 +241,7 @@ where
             select::Either::Second(result) => match result {
                 Ok(_) => {
                     log::info!("SW3526 task success");
-                    self.charge_channel.send(self.current_channel_state.clone()).await;
+                    self.charge_channel.send(self.current_channel_state).await;
                 }
                 Err(err) => {
                     log::error!("SW3526 task error.");
@@ -438,7 +438,10 @@ macro_rules! do_channel_task {
 
 #[embassy_executor::task]
 pub(crate) async fn task(
-    i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::master::I2c<'static, esp_hal::Async>>,
+    i2c_mutex: &'static Mutex<
+        CriticalSectionRawMutex,
+        esp_hal::i2c::master::I2c<'static, esp_hal::Async>,
+    >,
 ) {
     let pca9546a_i2c_dev = I2cDevice::new(i2c_mutex);
     let mux_chip_0: PCA9546A<

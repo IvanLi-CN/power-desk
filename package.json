@@ -1,0 +1,27 @@
+{
+  "name": "power-desk",
+  "version": "0.1.0",
+  "description": "ESP32-C3 based power management device",
+  "private": true,
+  "devDependencies": {
+    "@commitlint/cli": "^18.0.0",
+    "markdownlint-cli2": "^0.10.0"
+  },
+  "scripts": {
+    "commitlint": "commitlint",
+    "lint:md": "markdownlint-cli2 '**/*.md'",
+    "setup": "chmod +x tools/setup-dev-tools.sh && ./tools/setup-dev-tools.sh"
+  },
+  "keywords": [
+    "esp32",
+    "embedded",
+    "rust",
+    "power-management",
+    "iot"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IvanLi-CN/power-desk.git"
+  },
+  "license": "MIT OR Apache-2.0"
+}

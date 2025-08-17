@@ -13,7 +13,7 @@ pub enum WiFiConnectStatus {
 
 impl Display for WiFiConnectStatus {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -160,4 +160,5 @@ pub(crate) static CHARGE_CHANNEL_SERIES_ITEM_CHANNELS: [ChargeChannelSeriesItemC
     Channel::new(),
 ];
 
-pub(crate) static VIN_STATUS_CFG_CHANNEL: Channel<CriticalSectionRawMutex, VinState, 1> = Channel::new();
+pub(crate) static VIN_STATUS_CFG_CHANNEL: Channel<CriticalSectionRawMutex, VinState, 1> =
+    Channel::new();

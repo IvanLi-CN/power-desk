@@ -10,12 +10,9 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Io, Level, Output},
-    i2c::master::{I2c, Config as I2cConfig},
+    i2c::master::{Config as I2cConfig, I2c},
     rng::Rng,
-    timer::{
-        systimer::SystemTimer,
-        timg::TimerGroup,
-    },
+    timer::{systimer::SystemTimer, timg::TimerGroup},
 };
 // WifiDevice import removed as it's no longer needed
 use mqtt::mqtt_task;
@@ -55,7 +52,11 @@ async fn main(spawner: Spawner) {
     esp_hal_embassy::init(systimer.alarm0);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let vin_ctl_pin = Output::new(peripherals.GPIO7, Level::Low, esp_hal::gpio::OutputConfig::default());
+    let vin_ctl_pin = Output::new(
+        peripherals.GPIO7,
+        Level::Low,
+        esp_hal::gpio::OutputConfig::default(),
+    );
 
     log::info!("vin_ctl_pin: {:?}", vin_ctl_pin.is_set_high());
 
@@ -68,13 +69,16 @@ async fn main(spawner: Spawner) {
 
     // Wi-Fi
 
-    static INIT: static_cell::StaticCell<esp_wifi::EspWifiController<'static>> = static_cell::StaticCell::new();
-    let init = INIT.init(esp_wifi::init(
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap());
+    static INIT: static_cell::StaticCell<esp_wifi::EspWifiController<'static>> =
+        static_cell::StaticCell::new();
+    let init = INIT.init(
+        esp_wifi::init(
+            timg0.timer0,
+            Rng::new(peripherals.RNG),
+            peripherals.RADIO_CLK,
+        )
+        .unwrap(),
+    );
     let wifi = peripherals.WIFI;
     let (controller, interfaces) = esp_wifi::wifi::new(init, wifi).unwrap();
     let wifi_interface = interfaces.sta;
@@ -82,17 +86,16 @@ async fn main(spawner: Spawner) {
     let seed = 1234; // very random, very secure seed
 
     // Init network stack
-    static STACK_RESOURCES: static_cell::StaticCell<StackResources<3>> = static_cell::StaticCell::new();
+    static STACK_RESOURCES: static_cell::StaticCell<StackResources<3>> =
+        static_cell::StaticCell::new();
     let stack_resources = STACK_RESOURCES.init(StackResources::<3>::new());
 
-    static STACK: static_cell::StaticCell<embassy_net::Stack<'static>> = static_cell::StaticCell::new();
-    static RUNNER: static_cell::StaticCell<embassy_net::Runner<'static, esp_wifi::wifi::WifiDevice<'static>>> = static_cell::StaticCell::new();
-    let (stack, runner) = embassy_net::new(
-        wifi_interface,
-        config,
-        stack_resources,
-        seed
-    );
+    static STACK: static_cell::StaticCell<embassy_net::Stack<'static>> =
+        static_cell::StaticCell::new();
+    static RUNNER: static_cell::StaticCell<
+        embassy_net::Runner<'static, esp_wifi::wifi::WifiDevice<'static>>,
+    > = static_cell::StaticCell::new();
+    let (stack, runner) = embassy_net::new(wifi_interface, config, stack_resources, seed);
     let stack = STACK.init(stack);
     let runner = RUNNER.init(runner);
 

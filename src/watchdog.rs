@@ -1,6 +1,6 @@
+use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Instant, Timer};
-use embassy_executor::Spawner;
 
 /// 看门狗监控的任务类型
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -98,7 +98,10 @@ impl WatchdogState {
         if self.consecutive_restarts >= MAX_CONSECUTIVE_RESTARTS {
             if let Some(last_restart) = self.last_restart_time {
                 if last_restart.elapsed().as_millis() < BACKOFF_WINDOW_MS {
-                    log::warn!("Watchdog: Too many consecutive restarts ({}), applying backoff", self.consecutive_restarts);
+                    log::warn!(
+                        "Watchdog: Too many consecutive restarts ({}), applying backoff",
+                        self.consecutive_restarts
+                    );
                     return true;
                 }
             }
@@ -114,10 +117,13 @@ impl WatchdogState {
         if self.consecutive_restarts > 2 {
             let multiplier = (self.consecutive_restarts - 1).min(5); // 最多5倍
             self.timeout_duration = Duration::from_millis(
-                self.base_timeout_duration.as_millis() as u64 * multiplier as u64
+                self.base_timeout_duration.as_millis() as u64 * multiplier as u64,
             );
-            log::warn!("Watchdog: Increased timeout to {}ms due to {} consecutive restarts",
-                      self.timeout_duration.as_millis(), self.consecutive_restarts);
+            log::warn!(
+                "Watchdog: Increased timeout to {}ms due to {} consecutive restarts",
+                self.timeout_duration.as_millis(),
+                self.consecutive_restarts
+            );
         }
     }
 
@@ -135,7 +141,10 @@ impl WatchdogState {
             info,
             "Protector: {}ms ago, ChargeChannel: {}ms ago",
             self.protector_status.last_feed_time.elapsed().as_millis(),
-            self.charge_channel_status.last_feed_time.elapsed().as_millis()
+            self.charge_channel_status
+                .last_feed_time
+                .elapsed()
+                .as_millis()
         );
         info
     }
@@ -211,13 +220,13 @@ fn system_restart() -> ! {
 #[embassy_executor::task]
 pub async fn watchdog_task() {
     log::info!("Watchdog task started");
-    
+
     let check_interval = Duration::from_millis(500); // 每500ms检查一次
     let mut status_report_counter = 0u32;
-    
+
     loop {
         Timer::after(check_interval).await;
-        
+
         // 检查是否有任务超时
         if let Some(timeout_task) = check_watchdog_timeouts().await {
             log::error!("Watchdog timeout detected for task: {:?}", timeout_task);
@@ -236,14 +245,16 @@ pub async fn watchdog_task() {
 
         // 每10秒打印一次状态信息（用于调试）
         status_report_counter += 1;
-        if status_report_counter >= 20 { // 20 * 500ms = 10s
+        if status_report_counter >= 20 {
+            // 20 * 500ms = 10s
             status_report_counter = 0;
             if let Some(status) = get_watchdog_status().await {
                 log::info!("Watchdog status: {}", status.as_str());
             }
 
             // 如果系统运行稳定超过60秒，重置重启计数器
-            if status_report_counter % 120 == 0 { // 120 * 500ms = 60s
+            if status_report_counter % 120 == 0 {
+                // 120 * 500ms = 60s
                 reset_restart_counter().await;
             }
         }
@@ -251,14 +262,17 @@ pub async fn watchdog_task() {
 }
 
 /// 启动看门狗系统
-pub async fn start_watchdog(spawner: &Spawner, timeout_ms: u64) -> Result<(), embassy_executor::SpawnError> {
+pub async fn start_watchdog(
+    spawner: &Spawner,
+    timeout_ms: u64,
+) -> Result<(), embassy_executor::SpawnError> {
     init_watchdog(timeout_ms).await;
     spawner.spawn(watchdog_task())
 }
 
 // 导入必要的格式化支持
-use heapless::String;
 use core::fmt::Write;
+use heapless::String;
 
 /// 测试看门狗功能 - 故意让任务卡死
 #[embassy_executor::task]
@@ -276,7 +290,11 @@ pub async fn test_watchdog_timeout() {
 }
 
 /// 启动看门狗测试模式
-pub async fn start_watchdog_test(spawner: &Spawner, timeout_ms: u64) -> Result<(), embassy_executor::SpawnError> {
+#[allow(dead_code)]
+pub async fn start_watchdog_test(
+    spawner: &Spawner,
+    timeout_ms: u64,
+) -> Result<(), embassy_executor::SpawnError> {
     init_watchdog(timeout_ms).await;
     spawner.spawn(watchdog_task())?;
     spawner.spawn(test_watchdog_timeout())

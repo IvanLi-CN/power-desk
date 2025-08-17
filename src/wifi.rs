@@ -5,10 +5,7 @@ use crate::config;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_wifi::wifi::{
-    ClientConfiguration, Configuration, WifiController, WifiEvent,
-    WifiState,
-};
+use esp_wifi::wifi::{ClientConfiguration, Configuration, WifiController, WifiEvent, WifiState};
 
 // 获取WiFi配置的函数
 fn get_wifi_credentials() -> (&'static str, &'static str) {
@@ -50,8 +47,8 @@ pub async fn connection(mut controller: WifiController<'static>) {
         }
         if !matches!(controller.is_started(), Ok(true)) {
             let client_config = Configuration::Client(ClientConfiguration {
-                ssid: ssid.try_into().unwrap(),
-                password: password.try_into().unwrap(),
+                ssid: ssid.into(),
+                password: password.into(),
                 ..Default::default()
             });
             controller.set_configuration(&client_config).unwrap();
@@ -105,6 +102,8 @@ pub async fn get_ip_addr(stack: &'static embassy_net::Stack<'static>) {
 }
 
 #[embassy_executor::task]
-pub async fn net_task(runner: &'static mut embassy_net::Runner<'static, esp_wifi::wifi::WifiDevice<'static>>) {
+pub async fn net_task(
+    runner: &'static mut embassy_net::Runner<'static, esp_wifi::wifi::WifiDevice<'static>>,
+) {
     runner.run().await
 }

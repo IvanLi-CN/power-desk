@@ -1,5 +1,5 @@
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_futures::select::{select, select3, Either, Either3};
+use embassy_futures::select::{select, Either};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
 use embedded_hal_async::i2c::I2c;
@@ -17,7 +17,10 @@ const MAX_FAIL_TIMES: u8 = 3;
 
 #[embassy_executor::task]
 pub async fn task(
-    i2c_mutex: &'static Mutex<CriticalSectionRawMutex, esp_hal::i2c::master::I2c<'static, esp_hal::Async>>,
+    i2c_mutex: &'static Mutex<
+        CriticalSectionRawMutex,
+        esp_hal::i2c::master::I2c<'static, esp_hal::Async>,
+    >,
     vin_ctl_pin: esp_hal::gpio::Output<'static>,
 ) {
     let i2c_dev = I2cDevice::new(i2c_mutex);
