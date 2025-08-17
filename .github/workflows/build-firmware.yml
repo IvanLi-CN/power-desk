@@ -1,0 +1,170 @@
+name: Build and Release Firmware
+
+on:
+  push:
+    tags:
+      - 'v*'  # 当推送版本标签时触发
+  workflow_dispatch:  # 允许手动触发
+    inputs:
+      version:
+        description: 'Version tag for the firmware'
+        required: true
+        default: 'dev'
+
+env:
+  CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build-firmware:
+    name: Build ESP32-C3 Firmware
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf
+          toolchain: nightly-2024-06-12
+          components: rust-src
+          
+      - name: Enable caching
+        uses: Swatinem/rust-cache@v2
+        
+      - name: Install espflash
+        run: cargo install espflash
+        
+      - name: Build firmware
+        run: cargo build --release
+        
+      - name: Generate firmware binary
+        run: |
+          # Create output directory
+          mkdir -p firmware-output
+
+          # Generate firmware binary
+          espflash save-image \
+            --chip esp32c3 \
+            --merge \
+            --skip-padding \
+            target/riscv32imc-unknown-none-elf/release/power-desk \
+            firmware-output/power-desk-firmware.bin
+
+          # Create versioned filename
+          if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="${{ github.event.inputs.version || 'dev' }}"
+          fi
+
+          cp firmware-output/power-desk-firmware.bin firmware-output/power-desk-${VERSION}.bin
+
+          # Generate file information
+          ls -la firmware-output/
+          sha256sum firmware-output/*.bin > firmware-output/checksums.txt
+          
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: power-desk-firmware
+          path: firmware-output/
+          retention-days: 30
+          
+      - name: Create Release (for tags)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            firmware-output/power-desk-*.bin
+            firmware-output/checksums.txt
+          body: |
+            ## Power Desk Firmware ${{ github.ref_name }}
+
+            ### Download Instructions
+            - `power-desk-${{ github.ref_name }}.bin` - Main firmware file
+            - `checksums.txt` - File checksums
+
+            ### Flashing Instructions
+            1. Connect hardware (refer to project documentation)
+            2. Enter download mode
+            3. Flash using espflash:
+               ```bash
+               espflash flash power-desk-${{ github.ref_name }}.bin --monitor
+               ```
+
+            ### WiFi Configuration
+            Use the web configuration tool: [Power Desk Config Tool](https://github.com/IvanLi-CN/power-desk/tree/main/web-config-tool)
+          draft: false
+          prerelease: false
+          
+  build-dev-firmware:
+    name: Build Development Firmware
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf
+          toolchain: nightly-2024-06-12
+          components: rust-src
+          
+      - name: Enable caching
+        uses: Swatinem/rust-cache@v2
+        
+      - name: Install espflash
+        run: cargo install espflash
+        
+      - name: Build firmware
+        run: cargo build --release
+        
+      - name: Generate firmware binary
+        run: |
+          mkdir -p firmware-output
+          
+          espflash save-image \
+            --chip esp32c3 \
+            --merge \
+            --skip-padding \
+            target/riscv32imc-unknown-none-elf/release/power-desk \
+            firmware-output/power-desk-dev-latest.bin
+            
+          sha256sum firmware-output/*.bin > firmware-output/checksums.txt
+          
+      - name: Upload development firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: power-desk-dev-firmware
+          path: firmware-output/
+          retention-days: 7
+          
+      - name: Update development release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: dev-latest
+          name: "Development Build (Latest)"
+          files: |
+            firmware-output/power-desk-dev-latest.bin
+            firmware-output/checksums.txt
+          body: |
+            ## Power Desk Development Firmware (Latest)
+
+            ⚠️ **This is a development version and may be unstable!**
+
+            Build time: ${{ github.event.head_commit.timestamp }}
+            Commit: ${{ github.sha }}
+
+            ### Flashing Instructions
+            ```bash
+            espflash flash power-desk-dev-latest.bin --monitor
+            ```
+          draft: false
+          prerelease: true
+          make_latest: false
