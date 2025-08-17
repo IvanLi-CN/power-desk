@@ -3,8 +3,10 @@ name: Build and Release Firmware
 on:
   push:
     tags:
-      - 'v*'  # 当推送版本标签时触发
-  workflow_dispatch:  # 允许手动触发
+      - 'v*'
+    branches:
+      - 'main'
+  workflow_dispatch:
     inputs:
       version:
         description: 'Version tag for the firmware'
@@ -128,14 +130,21 @@ jobs:
       - name: Generate firmware binary
         run: |
           mkdir -p firmware-output
-          
+
+          # Get short commit hash for versioning
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
           espflash save-image \
             --chip esp32c3 \
             --merge \
             --skip-padding \
             target/riscv32imc-unknown-none-elf/release/power-desk \
             firmware-output/power-desk-dev-latest.bin
-            
+
+          # Also create a versioned copy with commit hash
+          cp firmware-output/power-desk-dev-latest.bin firmware-output/power-desk-dev-${TIMESTAMP}-${COMMIT_HASH}.bin
+
           sha256sum firmware-output/*.bin > firmware-output/checksums.txt
           
       - name: Upload development firmware
@@ -158,13 +167,22 @@ jobs:
 
             ⚠️ **This is a development version and may be unstable!**
 
-            Build time: ${{ github.event.head_commit.timestamp }}
-            Commit: ${{ github.sha }}
+            **Build Information:**
+            - Build time: ${{ github.event.head_commit.timestamp }}
+            - Commit: ${{ github.sha }}
+            - Commit message: ${{ github.event.head_commit.message }}
+
+            **Available Files:**
+            - `power-desk-dev-latest.bin` - Latest development firmware (always updated)
+            - `power-desk-dev-*-*.bin` - Versioned firmware with timestamp and commit hash
 
             ### Flashing Instructions
             ```bash
             espflash flash power-desk-dev-latest.bin --monitor
             ```
+
+            ### Using Web Configuration Tool
+            After flashing, you can configure WiFi using the [web configuration tool](https://github.com/IvanLi-CN/power-desk/tree/main/web-config-tool).
           draft: false
           prerelease: true
           make_latest: false
