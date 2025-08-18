@@ -14,35 +14,42 @@
 ## 使用方法
 
 ### 1. 打开工具
+
 直接在浏览器中打开 `index.html` 文件，或部署到任何静态网站托管服务。
 
 ### 2. 选择固件版本（可选）
+
 - 可以选择 Release 版本或开发分支
 - 工具会自动从 GitHub 获取可用版本列表
 - 也可以直接上传自己编译的固件文件
 
 ### 3. 配置 WiFi 参数
+
 - 输入 WiFi 名称（SSID）：最大 32 字节
 - 输入 WiFi 密码：最大 64 字节
 - 工具会实时显示字节数统计
 
 ### 4. 上传固件文件
+
 - 拖拽 `.bin` 固件文件到上传区域
 - 或点击"选择文件"按钮选择文件
 - 工具会自动检测和显示当前配置
 
 ### 5. 应用配置
+
 - 点击"应用配置"按钮
 - 工具会在固件中查找配置结构并更新
 - 自动计算和验证 CRC16 校验和
 
 ### 6. 下载配置后的固件
+
 - 点击"下载固件"按钮
 - 获得配置好的 `power-desk-configured.bin` 文件
 
 ## 硬件连接和烧录
 
 ### 硬件连接
+
 烧录固件前，请按以下步骤连接硬件：
 
 1. **断开所有电源**
@@ -60,16 +67,19 @@
 ### 烧录命令
 
 1. **安装 espflash（如果未安装）：**
+
    ```bash
    cargo install espflash
    ```
 
 2. **烧录固件：**
+
    ```bash
    espflash flash power-desk-configured.bin --monitor
    ```
 
 3. **指定端口（可选）：**
+
    ```bash
    espflash flash power-desk-configured.bin --port /dev/ttyUSB0 --monitor
    ```
@@ -77,12 +87,14 @@
 ## 技术实现
 
 ### 核心功能
+
 - **二进制文件处理**：使用 JavaScript 的 ArrayBuffer 和 DataView API
 - **CRC16 校验**：实现与 Python 版本相同的校验算法
 - **配置结构解析**：精确解析 108 字节的配置结构体
 - **文件操作**：支持拖拽上传和下载功能
 
 ### 配置结构
+
 ```c
 struct WifiConfig {
     uint32_t magic;           // 0x57494649 ("WIFI")
@@ -98,6 +110,7 @@ struct WifiConfig {
 ```
 
 ### 兼容性
+
 - 与现有的 `config_tool.py` 完全兼容
 - 生成的固件可以正常烧录和运行
 - 支持所有现代浏览器（Chrome、Firefox、Safari、Edge）
@@ -200,18 +213,21 @@ http-server -p 3000
 
 **Q: 上传文件后提示"WiFi 配置结构未在固件中找到"**
 A: 这可能是因为：
+
 - 固件文件不是 Power Desk 项目的固件
 - 固件是用旧版本编译的，不包含配置结构
 - 文件损坏或格式不正确
 
 **Q: 配置应用后校验失败**
 A: 请检查：
+
 - SSID 和密码长度是否超出限制
 - 输入的字符是否包含特殊字符
 - 尝试重新上传固件文件
 
 **Q: 下载的固件无法烧录**
 A: 请确认：
+
 - 硬件连接正确
 - 设备已进入下载模式
 - espflash 工具已正确安装
@@ -219,7 +235,8 @@ A: 请确认：
 ## 开发说明
 
 ### 文件结构
-```
+
+```text
 web-config-tool/
 ├── index.html          # 主页面
 ├── config-tool.js      # 核心 JavaScript 功能
@@ -227,10 +244,12 @@ web-config-tool/
 ```
 
 ### 核心类
+
 - `WifiConfigTool`: 主要的配置处理类
 - 包含固件解析、配置更新、校验等功能
 
 ### 主要函数
+
 - `findConfigOffset()`: 查找配置结构位置
 - `calculateCRC16()`: 计算 CRC16 校验和
 - `parseConfig()`: 解析配置结构
