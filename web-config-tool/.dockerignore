@@ -1,0 +1,58 @@
+# Git 相关
+.git
+.gitignore
+.gitattributes
+
+# 文档文件
+README.md
+USAGE.md
+*.md
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE 和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 开发工具和脚本（保留必要的）
+# create-test-firmware.py  # 这个可能在容器中不需要
+# start-server.sh  # 我们会用 Docker 启动
+
+# Docker 相关文件
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-build.sh
+docker-run.sh
+
+# 缓存和构建产物
+node_modules/
+.bun/
+dist/
+build/
+coverage/
+
+# 环境文件
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# 测试文件（如果有的话）
+test/
+tests/
+__tests__/
+*.test.js
+*.spec.js

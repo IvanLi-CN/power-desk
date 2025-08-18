@@ -190,7 +190,7 @@ async function serveStatic(pathname) {
       pathname = '/index.html';
     }
 
-    const filePath = `./web-config-tool${pathname}`;
+    const filePath = `.${pathname}`;
     const file = Bun.file(filePath);
     
     if (await file.exists()) {

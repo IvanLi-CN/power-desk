@@ -104,9 +104,33 @@ struct WifiConfig {
 
 ## 部署方式
 
-### 🚀 推荐：本地代理服务器（最佳体验）
+### 🐳 推荐：Docker 部署（生产级）
 
-**使用内置的 Bun 服务器，完美解决 CORS 问题，带缓存和安全白名单：**
+**使用 Docker 容器化部署，支持一键启动，生产环境首选：**
+
+```bash
+# 方法一：使用构建脚本（推荐）
+cd web-config-tool
+./docker-build.sh
+./docker-run.sh
+
+# 方法二：使用 docker-compose
+docker-compose up -d
+
+# 访问 http://localhost:25080
+```
+
+**Docker 特性：**
+
+- 🐳 **容器化部署**：一键构建和运行，环境隔离
+- 🛡️ **生产级安全**：非 root 用户运行，健康检查
+- 📦 **轻量镜像**：340MB 优化镜像，多阶段构建
+- 🔄 **易于扩展**：支持 docker-compose 编排
+- 📚 **完整文档**：详见 [DOCKER.md](./DOCKER.md)
+
+### 🚀 本地开发：Bun 服务器
+
+**使用内置的 Bun 服务器进行本地开发：**
 
 ```bash
 # 1. 确保已安装 Bun (https://bun.sh/)
@@ -118,7 +142,7 @@ bun run power-desk-server.js
 # 或者使用启动脚本
 ./start-server.sh
 
-# 3. 访问 http://localhost:3000
+# 3. 访问 http://localhost:25080
 ```
 
 **服务器特性：**

@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  power-desk-config-tool:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: power-desk-config-tool:latest
+    container_name: power-desk-config-tool
+    ports:
+      - "25080:25080"
+    environment:
+      - NODE_ENV=production
+      - PORT=25080
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:25080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # 资源限制（可选，根据需要调整）
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# 可选：如果需要持久化数据或配置
+# volumes:
+#   config_data:
+#     driver: local
+
+networks:
+  default:
+    name: power-desk-network
