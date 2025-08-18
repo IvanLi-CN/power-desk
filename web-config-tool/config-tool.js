@@ -1,12 +1,42 @@
 // Power Desk 固件配置工具 - JavaScript 实现
 // 基于 config_tool.py 的纯前端版本
 
+// API 配置 - 检测是否使用代理服务器
+const API_CONFIG = {
+    // 检测当前是否通过代理服务器访问
+    useProxy: window.location.protocol === 'http:' && window.location.hostname === 'localhost',
+
+    // GitHub API 端点
+    getGitHubAPI: (path) => {
+        if (API_CONFIG.useProxy) {
+            return `/api/github${path}`;
+        }
+        return `https://api.github.com${path}`;
+    },
+
+    // GitHub 下载端点
+    getGitHubDownload: (url) => {
+        if (API_CONFIG.useProxy && url.includes('github.com/')) {
+            // 将 GitHub 下载 URL 转换为代理 URL
+            const path = url.replace('https://github.com', '');
+            return `/download/github${path}`;
+        }
+        return url;
+    }
+};
+
+console.log('API Configuration:', {
+    useProxy: API_CONFIG.useProxy,
+    location: window.location.href
+});
+
 class WifiConfigTool {
     constructor() {
         this.MAGIC = 0x57494649; // "WIFI" in little-endian
         this.VERSION = 1;
         this.STRUCT_SIZE = 108; // 4+2+2+1+1+1+1+32+64
         this.currentFirmware = null;
+        this.currentFirmwareInfo = null; // 存储固件信息（版本、项目名等）
         this.configOffset = null;
     }
 
@@ -182,7 +212,7 @@ function setTheme(theme) {
 
 // 页面加载时恢复主题
 document.addEventListener('DOMContentLoaded', function() {
-    const savedTheme = localStorage.getItem('theme') || 'lemonade';
+    const savedTheme = localStorage.getItem('theme') || 'caramellatte';
     setTheme(savedTheme);
     
     // 初始化事件监听器
@@ -326,8 +356,34 @@ function switchVersionType(type) {
     });
     event.target.classList.add('tab-active');
 
-    // 重新加载版本列表
-    loadVersions();
+    // 显示/隐藏对应的界面
+    const onlineSelector = document.getElementById('online-version-selector');
+    const localSelector = document.getElementById('local-file-selector');
+    const onlineInfo = document.getElementById('online-version-info');
+    const localInfo = document.getElementById('local-file-info');
+
+    if (type === 'local') {
+        // 显示本地文件上传界面
+        onlineSelector.classList.add('hidden');
+        localSelector.classList.remove('hidden');
+        onlineInfo.classList.add('hidden');
+        localInfo.classList.remove('hidden');
+
+        // 清空固件状态
+        configTool.currentFirmware = null;
+        configTool.currentFirmwareInfo = null;
+        updateFirmwareDisplay();
+    } else {
+        // 显示在线版本选择界面
+        onlineSelector.classList.remove('hidden');
+        localSelector.classList.add('hidden');
+        onlineInfo.classList.remove('hidden');
+        localInfo.classList.add('hidden');
+
+        // 重新加载版本列表
+        loadVersions();
+    }
+
     updateStepIndicator(1);
 }
 
@@ -341,7 +397,9 @@ async function loadVersions() {
 
         if (currentVersionType === 'release') {
             // 获取 Power Desk 项目的 releases
-            const response = await fetch('https://api.github.com/repos/IvanLi-CN/power-desk/releases');
+            const apiUrl = API_CONFIG.getGitHubAPI('/repos/IvanLi-CN/power-desk/releases');
+            console.log('Fetching releases from:', apiUrl);
+            const response = await fetch(apiUrl);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -356,7 +414,9 @@ async function loadVersions() {
             }));
         } else {
             // 获取 Power Desk 项目的 branches
-            const response = await fetch('https://api.github.com/repos/IvanLi-CN/power-desk/branches');
+            const apiUrl = API_CONFIG.getGitHubAPI('/repos/IvanLi-CN/power-desk/branches');
+            console.log('Fetching branches from:', apiUrl);
+            const response = await fetch(apiUrl);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -577,8 +637,11 @@ function applyConfiguration() {
             throw new Error('配置校验失败');
         }
 
-        // 更新显示
-        displayFirmwareInfo('power-desk-configured.bin', config);
+        // 更新显示 - 使用配置后的文件名
+        const configuredName = configTool.currentFirmwareInfo ?
+            configTool.currentFirmwareInfo.configuredName :
+            'power-desk-configured.bin';
+        displayFirmwareInfo(configuredName, config);
 
         // 启用下载按钮
         document.getElementById('download-btn').disabled = false;
@@ -602,13 +665,18 @@ function downloadConfiguredFirmware() {
     }
 
     try {
+        // 生成下载文件名
+        const downloadName = configTool.currentFirmwareInfo ?
+            configTool.currentFirmwareInfo.configuredName :
+            'power-desk-configured.bin';
+
         // 创建下载链接
         const blob = new Blob([configTool.currentFirmware], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
 
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'power-desk-configured.bin';
+        a.download = downloadName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -681,13 +749,18 @@ async function handleVersionSelect(event) {
         return;
     }
 
-    const firmwareUrl = selectedOption.dataset.firmwareUrl;
+    const originalFirmwareUrl = selectedOption.dataset.firmwareUrl;
+    const firmwareUrl = API_CONFIG.getGitHubDownload(originalFirmwareUrl);
     const versionName = selectedOption.textContent.replace(' ✅', '').replace(' ⚠️', '');
 
-    showLoadingModal(`正在下载 ${versionName} 固件...`);
+    // 生成规范的固件信息
+    const firmwareInfo = generateFirmwareInfo(versionName, originalFirmwareUrl);
+
+    showLoadingModal(`正在下载 ${firmwareInfo.displayName} 固件...`);
 
     try {
         // 下载固件
+        console.log('Downloading firmware from:', firmwareUrl);
         const response = await fetch(firmwareUrl);
         if (!response.ok) {
             throw new Error(`下载失败: ${response.status} ${response.statusText}`);
@@ -696,26 +769,69 @@ async function handleVersionSelect(event) {
         const arrayBuffer = await response.arrayBuffer();
         configTool.currentFirmware = arrayBuffer;
 
+        // 保存固件信息供后续使用
+        configTool.currentFirmwareInfo = firmwareInfo;
+
         // 尝试读取当前配置
         try {
             const config = configTool.readConfig(arrayBuffer);
-            displayFirmwareInfo(`${versionName} (已下载)`, config);
+            displayFirmwareInfo(firmwareInfo.fullName, config);
         } catch (error) {
             // 如果没有找到配置结构，仍然可以使用文件
-            displayFirmwareInfo(`${versionName} (已下载)`, null);
+            displayFirmwareInfo(firmwareInfo.fullName, null);
         }
 
         enableButtons();
         updateStepIndicator(2);
-        showSuccess(`${versionName} 固件下载成功！`);
+        showSuccess(`${firmwareInfo.displayName} 固件下载成功！`);
 
     } catch (error) {
         console.error('固件下载失败:', error);
         showError(`固件下载失败: ${error.message}`);
         configTool.currentFirmware = null;
+        configTool.currentFirmwareInfo = null;
     } finally {
         hideLoadingModal();
     }
+}
+
+// 生成规范的固件信息
+function generateFirmwareInfo(versionName, firmwareUrl) {
+    const projectName = 'power-desk';
+    let version = versionName;
+    let type = 'release';
+
+    // 判断版本类型
+    if (versionName.includes('development') || versionName === 'main') {
+        type = 'dev';
+        if (versionName === 'main') {
+            version = 'dev-latest';
+        }
+    }
+
+    // 从 URL 中提取更精确的版本信息
+    if (firmwareUrl.includes('/dev-latest/')) {
+        version = 'dev-latest';
+        type = 'dev';
+    } else if (firmwareUrl.includes('/download/')) {
+        const urlParts = firmwareUrl.split('/download/');
+        if (urlParts.length > 1) {
+            const versionPart = urlParts[1].split('/')[0];
+            if (versionPart && versionPart !== 'dev-latest') {
+                version = versionPart;
+                type = 'release';
+            }
+        }
+    }
+
+    return {
+        projectName,
+        version,
+        type,
+        displayName: `${projectName}-${version}`,
+        fullName: `${projectName}-${version}.bin`,
+        configuredName: `${projectName}-${version}-configured.bin`
+    };
 }
 
 // 下载固件文件
@@ -732,3 +848,130 @@ async function downloadFirmwareFromUrl(url, filename) {
         throw new Error(`下载失败: ${error.message}`);
     }
 }
+
+// 更新固件显示状态
+function updateFirmwareDisplay() {
+    const noFirmwareAlert = document.getElementById('no-firmware-alert');
+    const firmwareInfo = document.getElementById('firmware-info');
+
+    if (configTool.currentFirmware) {
+        if (noFirmwareAlert) noFirmwareAlert.style.display = 'none';
+        if (firmwareInfo) firmwareInfo.style.display = 'block';
+    } else {
+        if (noFirmwareAlert) noFirmwareAlert.style.display = 'block';
+        if (firmwareInfo) firmwareInfo.style.display = 'none';
+    }
+}
+
+// 处理本地文件上传
+function handleLocalFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    showLoadingModal(`正在加载 ${file.name}...`);
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const arrayBuffer = e.target.result;
+            configTool.currentFirmware = arrayBuffer;
+
+            // 生成本地文件的固件信息
+            const fileName = file.name.replace(/\.[^/.]+$/, ""); // 移除扩展名
+            configTool.currentFirmwareInfo = {
+                projectName: fileName,
+                version: 'local',
+                type: 'local',
+                displayName: fileName,
+                fullName: file.name,
+                configuredName: `${fileName}-configured.bin`
+            };
+
+            // 尝试读取当前配置
+            try {
+                const config = configTool.readConfig(arrayBuffer);
+                displayFirmwareInfo(file.name, config);
+            } catch (error) {
+                // 如果没有找到配置结构，仍然可以使用文件
+                displayFirmwareInfo(file.name, null);
+            }
+
+            enableButtons();
+            updateStepIndicator(2);
+            showSuccess(`${file.name} 加载成功！`);
+
+        } catch (error) {
+            console.error('文件加载失败:', error);
+            showError(`文件加载失败: ${error.message}`);
+            configTool.currentFirmware = null;
+            configTool.currentFirmwareInfo = null;
+        } finally {
+            hideLoadingModal();
+        }
+    };
+
+    reader.onerror = function() {
+        hideLoadingModal();
+        showError('文件读取失败');
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+// 初始化事件监听器
+function initializeEventListeners() {
+    // 版本选择
+    const versionSelect = document.getElementById('version-select');
+    if (versionSelect) {
+        versionSelect.addEventListener('change', handleVersionSelect);
+    }
+
+    // 本地文件上传
+    const firmwareFileInput = document.getElementById('firmware-file-input');
+    if (firmwareFileInput) {
+        firmwareFileInput.addEventListener('change', handleLocalFileUpload);
+    }
+
+    // 显示密码切换
+    const showPassword = document.getElementById('show-password');
+    if (showPassword) {
+        showPassword.addEventListener('change', function() {
+            const passwordInput = document.getElementById('wifi-password');
+            passwordInput.type = this.checked ? 'text' : 'password';
+        });
+    }
+
+    // 配置操作按钮
+    const readConfigBtn = document.getElementById('read-config-btn');
+    if (readConfigBtn) {
+        readConfigBtn.addEventListener('click', readCurrentConfig);
+    }
+
+    const applyConfigBtn = document.getElementById('apply-config-btn');
+    if (applyConfigBtn) {
+        applyConfigBtn.addEventListener('click', applyConfiguration);
+    }
+
+    const downloadBtn = document.getElementById('download-btn');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', downloadConfiguredFirmware);
+    }
+
+    // SSID 和密码输入框的字符计数
+    const ssidInput = document.getElementById('wifi-ssid');
+    if (ssidInput) {
+        ssidInput.addEventListener('input', updateSSIDCounter);
+    }
+
+    const passwordInput = document.getElementById('wifi-password');
+    if (passwordInput) {
+        passwordInput.addEventListener('input', updatePasswordCounter);
+    }
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    initializeEventListeners();
+    loadVersions();
+    updateStepIndicator(1);
+});

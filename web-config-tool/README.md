@@ -104,17 +104,70 @@ struct WifiConfig {
 
 ## 部署方式
 
-### 本地使用
-直接双击 `index.html` 文件在浏览器中打开。
+### 🚀 推荐：本地代理服务器（最佳体验）
 
-### 静态网站托管
+**使用内置的 Bun 服务器，完美解决 CORS 问题，带缓存和安全白名单：**
+
+```bash
+# 1. 确保已安装 Bun (https://bun.sh/)
+curl -fsSL https://bun.sh/install | bash
+
+# 2. 启动服务器
+cd web-config-tool
+bun run power-desk-server.js
+# 或者使用启动脚本
+./start-server.sh
+
+# 3. 访问 http://localhost:3000
+```
+
+**服务器特性：**
+
+- 🛡️ **安全白名单**：只允许访问 Power Desk 项目的 GitHub 资源
+- 💾 **智能缓存**：API 响应缓存 5-10 分钟，固件文件缓存 1 小时
+- 🔗 **代理功能**：自动代理 GitHub API 和下载请求，避免 CORS 问题
+- ⚡ **高性能**：基于 Bun 运行时，启动快速，内存占用低
+
+### 🌐 GitHub Pages（在线访问）
+
+适合不想安装本地服务器的用户：
+
+1. Fork 或 Clone 本项目到你的 GitHub 仓库
+2. 在仓库设置中启用 GitHub Pages
+3. 选择 `main` 分支的 `/web-config-tool` 目录作为源
+4. 访问 `https://你的用户名.github.io/仓库名/web-config-tool/`
+
+### 📦 其他本地服务器选项
+
+如果不想使用 Bun，也可以使用其他 HTTP 服务器：
+
+```bash
+# 使用 serve
+npm install -g serve
+serve web-config-tool -p 3000
+
+# 使用 Python
+cd web-config-tool
+python -m http.server 3000
+
+# 使用 Node.js http-server
+npm install -g http-server
+cd web-config-tool
+http-server -p 3000
+```
+
+**注意**：直接双击 `index.html` 会遇到 CORS 问题，必须使用 HTTP 服务器。
+
+### 🌍 其他静态网站托管
+
 可以部署到以下平台：
-- GitHub Pages
+
 - Netlify
 - Vercel
 - 任何支持静态文件的 Web 服务器
 
-### 离线使用
+### 📱 离线使用
+
 除了获取 GitHub 版本信息外，所有功能都支持离线使用。
 
 ## 故障排除

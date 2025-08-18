@@ -1,0 +1,22 @@
+{
+  "name": "power-desk-config-server",
+  "version": "1.0.0",
+  "description": "Power Desk Web Config Tool Server with GitHub proxy",
+  "main": "power-desk-server.js",
+  "scripts": {
+    "start": "bun run power-desk-server.js",
+    "dev": "bun run power-desk-server.js"
+  },
+  "keywords": [
+    "power-desk",
+    "config-tool",
+    "bun",
+    "proxy",
+    "github"
+  ],
+  "author": "Power Desk Team",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}

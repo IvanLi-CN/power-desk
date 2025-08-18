@@ -1,25 +1,12 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="lemonade">
+<html lang="zh-CN" data-theme="caramellatte">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power Desk 固件配置工具</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            daisyui: {
-                themes: ["lemonade", "sunset"],
-                darkTheme: "sunset",
-                base: true,
-                styled: true,
-                utils: true,
-                prefix: "",
-                logs: true,
-                themeRoot: ":root"
-            }
-        }
-    </script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="min-h-screen bg-base-100">
     <!-- 导航栏 -->
@@ -35,7 +22,7 @@
                     </svg>
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 text-base-content rounded-box z-[1] w-52 p-2 shadow">
-                    <li><a onclick="setTheme('lemonade')">🍋 亮色主题</a></li>
+                    <li><a onclick="setTheme('caramellatte')">☕ 亮色主题</a></li>
                     <li><a onclick="setTheme('sunset')">🌅 暗色主题</a></li>
                 </ul>
             </div>
@@ -70,9 +57,11 @@
                             <div class="tabs tabs-boxed">
                                 <a class="tab tab-active" onclick="switchVersionType('release')">Release 版本</a>
                                 <a class="tab" onclick="switchVersionType('branch')">开发分支</a>
+                                <a class="tab" onclick="switchVersionType('local')">本地文件</a>
                             </div>
                         </div>
-                        <div class="form-control mt-4">
+                        <!-- 在线版本选择 -->
+                        <div class="form-control mt-4" id="online-version-selector">
                             <label class="label">
                                 <span class="label-text">选择具体版本</span>
                             </label>
@@ -80,11 +69,30 @@
                                 <option disabled selected>正在加载版本信息...</option>
                             </select>
                         </div>
-                        <div class="alert alert-info mt-4">
+
+                        <!-- 本地文件上传 -->
+                        <div class="form-control mt-4 hidden" id="local-file-selector">
+                            <label class="label">
+                                <span class="label-text font-medium">选择本地固件文件</span>
+                            </label>
+                            <input type="file" class="file-input file-input-bordered file-input-primary w-full" id="firmware-file-input" accept=".bin,.hex,.elf">
+                            <div class="label">
+                                <span class="label-text-alt text-base-content/70">支持 .bin、.hex、.elf 格式的固件文件</span>
+                            </div>
+                        </div>
+
+                        <div class="alert bg-base-200 border border-base-300 mt-4" id="online-version-info">
                             <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
                             </svg>
                             <span>选择版本后将自动下载对应的预编译固件（✅ 表示有预编译固件可用）</span>
+                        </div>
+
+                        <div class="alert alert-warning mt-4 hidden" id="local-file-info">
+                            <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>请选择包含 Power Desk 项目的固件文件。工具会自动检测并读取其中的 WiFi 配置结构。</span>
                         </div>
                     </div>
                 </div>
@@ -100,23 +108,42 @@
                         </h2>
                         <div class="form-control">
                             <label class="label">
-                                <span class="label-text">WiFi 名称 (SSID)</span>
+                                <span class="label-text font-medium">WiFi 名称 (SSID)</span>
                                 <span class="label-text-alt" id="ssid-counter">0/32</span>
                             </label>
-                            <input type="text" placeholder="输入 WiFi 名称" class="input input-bordered" id="wifi-ssid" maxlength="32">
+                            <input type="text" placeholder="输入 WiFi 名称" class="input input-bordered input-primary w-full" id="wifi-ssid" maxlength="32">
                         </div>
-                        <div class="form-control">
+                        <div class="form-control mt-4">
                             <label class="label">
-                                <span class="label-text">WiFi 密码</span>
+                                <span class="label-text font-medium">WiFi 密码</span>
                                 <span class="label-text-alt" id="password-counter">0/64</span>
                             </label>
-                            <input type="password" placeholder="输入 WiFi 密码" class="input input-bordered" id="wifi-password" maxlength="64">
+                            <input type="password" placeholder="输入 WiFi 密码" class="input input-bordered input-primary w-full" id="wifi-password" maxlength="64">
                             <label class="label">
                                 <span class="label-text-alt">
-                                    <input type="checkbox" class="checkbox checkbox-xs" id="show-password">
-                                    显示密码
+                                    <label class="label cursor-pointer">
+                                        <input type="checkbox" class="checkbox checkbox-primary checkbox-sm" id="show-password">
+                                        <span class="label-text ml-2">显示密码</span>
+                                    </label>
                                 </span>
                             </label>
+                        </div>
+
+                        <!-- WiFi 配置操作按钮 -->
+                        <div class="card-actions justify-end mt-6">
+                            <button class="btn btn-outline" id="read-config-btn" disabled>
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
+                                    <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path>
+                                </svg>
+                                读取当前配置
+                            </button>
+                            <button class="btn btn-primary" id="apply-config-btn" disabled>
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                                应用配置
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -142,61 +169,28 @@
                             </div>
                         </div>
 
-                        <!-- 手动上传区域（备用） -->
-                        <div class="collapse collapse-arrow mt-4">
-                            <input type="checkbox" id="manual-upload-toggle">
-                            <div class="collapse-title text-sm font-medium">
-                                📁 手动上传固件文件（高级选项）
-                            </div>
-                            <div class="collapse-content">
-                                <div class="border-2 border-dashed border-base-300 rounded-lg p-6 text-center hover:border-primary transition-colors" id="drop-zone">
-                                    <svg class="w-8 h-8 mx-auto text-base-content/50 mb-2" fill="none" stroke="currentColor" viewBox="0 0 48 48">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"></path>
-                                    </svg>
-                                    <p class="text-sm font-medium text-base-content mb-2">拖拽固件文件到此处</p>
-                                    <p class="text-xs text-base-content/70 mb-3">或者</p>
-                                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input').click()">
-                                        选择文件
-                                    </button>
-                                    <input type="file" id="file-input" class="hidden" accept=".bin">
-                                    <p class="text-xs text-base-content/60 mt-2">仅在没有预编译固件时使用</p>
-                                </div>
-                            </div>
-                        </div>
+
 
                         <!-- 固件信息显示 -->
-                        <div class="mt-4" id="firmware-info" style="display: none;">
-                            <div class="alert alert-success">
-                                <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <div class="mt-6" id="firmware-info" style="display: none;">
+                            <div class="alert alert-success shadow-sm">
+                                <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                                 </svg>
-                                <div>
-                                    <div class="font-bold">固件已加载</div>
-                                    <div class="text-xs" id="firmware-details"></div>
+                                <div class="flex-1">
+                                    <div class="font-semibold text-base">固件已加载</div>
+                                    <div class="text-sm opacity-80 mt-1" id="firmware-details"></div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- 操作按钮 -->
-                        <div class="card-actions justify-end mt-6">
-                            <button class="btn btn-outline" id="read-config-btn" disabled>
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
-                                    <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path>
-                                </svg>
-                                读取当前配置
-                            </button>
-                            <button class="btn btn-primary" id="apply-config-btn" disabled>
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                                </svg>
-                                应用配置
-                            </button>
-                            <button class="btn btn-success" id="download-btn" disabled>
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <!-- 下载按钮 -->
+                        <div class="card-actions justify-center mt-6">
+                            <button class="btn btn-success btn-wide" id="download-btn" disabled>
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                                 </svg>
-                                下载固件
+                                下载配置后的固件
                             </button>
                         </div>
                     </div>
