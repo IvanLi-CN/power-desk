@@ -39,7 +39,6 @@ docker-run.sh
 # 缓存和构建产物
 node_modules/
 .bun/
-dist/
 build/
 coverage/
 

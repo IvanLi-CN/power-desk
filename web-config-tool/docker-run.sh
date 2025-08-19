@@ -16,7 +16,7 @@ fi
 # 设置镜像名称
 IMAGE_NAME="power-desk-config-tool:latest"
 CONTAINER_NAME="power-desk-config-tool"
-PORT="25080"
+PORT="25086"
 
 echo "🔍 检查镜像是否存在..."
 if ! docker images "${IMAGE_NAME}" --format "{{.Repository}}:{{.Tag}}" | grep -q "${IMAGE_NAME}"; then

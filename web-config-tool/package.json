@@ -1,15 +1,23 @@
 {
   "name": "power-desk-config-server",
   "version": "1.0.0",
-  "description": "Power Desk Web Config Tool Server with GitHub proxy",
-  "main": "power-desk-server.js",
+  "description": "Power Desk Web Config Tool Server with GitHub proxy and ESP32 flashing",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
-    "start": "bun run power-desk-server.js",
-    "dev": "bun run power-desk-server.js"
+    "dev": "vite",
+    "dev:server": "bun run server.js",
+    "build": "vite build",
+    "start": "NODE_ENV=production bun run server.js",
+    "preview": "vite preview"
   },
   "keywords": [
     "power-desk",
     "config-tool",
+    "esp32",
+    "esptool",
+    "web-serial",
+    "firmware-flashing",
     "bun",
     "proxy",
     "github"
@@ -18,5 +26,21 @@
   "license": "MIT",
   "engines": {
     "bun": ">=1.0.0"
-  }
+  },
+  "dependencies": {
+    "esptool-js": "^0.4.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.12",
+    "autoprefixer": "^10.4.0",
+    "daisyui": "^5.0.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^4.1.12",
+    "terser": "^5.43.1",
+    "vite": "^5.0.0"
+  },
+  "browserslist": [
+    "Chrome >= 89",
+    "Edge >= 89"
+  ]
 }

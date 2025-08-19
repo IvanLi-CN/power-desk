@@ -46,23 +46,32 @@ docker build -t power-desk-config-tool:latest .
 # 运行容器
 docker run -d \
   --name power-desk-config-tool \
-  -p 25080:25080 \
+  -p 25086:25086 \
   --restart unless-stopped \
   power-desk-config-tool:latest
 ```
 
 ## 🌐 访问服务
 
-启动后访问：<http://localhost:25080>
+启动后访问：<http://localhost:25086>
 
 ## 📊 镜像特性
 
-- **基础镜像**: oven/bun:1 (官方 Bun 镜像)
-- **镜像大小**: ~340MB
-- **架构**: 多阶段构建优化
+- **基础镜像**: oven/bun:1-alpine (官方 Bun 镜像)
+- **运行时**: Bun (高性能 JavaScript 运行时)
+- **镜像大小**: ~200MB (优化后)
+- **架构**: 单阶段构建优化
 - **安全性**: 非 root 用户运行
 - **健康检查**: 自动监控服务状态
-- **端口**: 25080
+- **端口**: 25086
+
+## 🏗️ 构建过程
+
+1. **基础环境**：使用 oven/bun:1-alpine 镜像
+2. **依赖安装**：使用 Bun 安装依赖
+3. **Vite 构建**：使用 Vite 构建完整的生产版本
+4. **应用复制**：复制服务器文件
+5. **环境配置**：设置生产环境变量
 
 ## 🛡️ 安全特性
 
@@ -99,7 +108,8 @@ docker inspect power-desk-config-tool --format='{{.State.Health.Status}}'
 ### 环境变量
 
 - `NODE_ENV=production` - 生产环境模式
-- `PORT=25080` - 服务端口
+- `PORT=25086` - 服务端口
+- `GITHUB_TOKEN` - GitHub API Token（可选，提高 API 限制）
 
 ### 资源限制
 
@@ -122,14 +132,14 @@ docker inspect power-desk-config-tool --format='{{.State.Health.Status}}'
 docker logs power-desk-config-tool
 
 # 检查端口占用
-lsof -i :25080
+lsof -i :25086
 ```
 
 ### 健康检查失败
 
 ```bash
 # 手动测试服务
-curl -f http://localhost:25080/
+curl -f http://localhost:25086/
 
 # 检查容器内部
 docker exec -it power-desk-config-tool bun --version

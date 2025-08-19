@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   power-desk-config-tool:
     build:
@@ -8,13 +6,13 @@ services:
     image: power-desk-config-tool:latest
     container_name: power-desk-config-tool
     ports:
-      - "25080:25080"
+      - "25086:25086"
     environment:
       - NODE_ENV=production
-      - PORT=25080
+      - PORT=25086
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:25080/"]
+      test: ["CMD", "curl", "-f", "http://localhost:25086/"]
       interval: 30s
       timeout: 10s
       retries: 3

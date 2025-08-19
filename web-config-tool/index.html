@@ -4,9 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power Desk 固件配置工具</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- 样式文件 -->
+    <link rel="stylesheet" href="/src/style.css">
+    <!-- ESP32 烧录功能 -->
+    <script>
+        // 提供 atob/btoa polyfill
+        if (typeof global === 'undefined') {
+            window.global = window;
+        }
+        if (typeof atob === 'undefined') {
+            window.atob = function(str) {
+                return Buffer.from(str, 'base64').toString('binary');
+            };
+        }
+        if (typeof btoa === 'undefined') {
+            window.btoa = function(str) {
+                return Buffer.from(str, 'binary').toString('base64');
+            };
+        }
+    </script>
+    <!-- 生产环境脚本 -->
+    <script type="module" src="/src/main.js"></script>
 </head>
 <body class="min-h-screen bg-base-100">
     <!-- 导航栏 -->
@@ -22,6 +40,7 @@
                     </svg>
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 text-base-content rounded-box z-[1] w-52 p-2 shadow">
+                    <li><a onclick="setAutoTheme()">🔄 自动切换</a></li>
                     <li><a onclick="setTheme('caramellatte')">☕ 亮色主题</a></li>
                     <li><a onclick="setTheme('sunset')">🌅 暗色主题</a></li>
                 </ul>
@@ -35,7 +54,8 @@
             <div class="step step-primary" id="step-1">选择版本</div>
             <div class="step" id="step-2">配置参数</div>
             <div class="step" id="step-3">处理固件</div>
-            <div class="step" id="step-4">下载烧录</div>
+            <div class="step" id="step-4">下载固件</div>
+            <div class="step" id="step-5">烧录设备</div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -119,14 +139,16 @@
                                 <span class="label-text-alt" id="password-counter">0/64</span>
                             </label>
                             <input type="password" placeholder="输入 WiFi 密码" class="input input-bordered input-primary w-full" id="wifi-password" maxlength="64">
-                            <label class="label">
-                                <span class="label-text-alt">
-                                    <label class="label cursor-pointer">
-                                        <input type="checkbox" class="checkbox checkbox-primary checkbox-sm" id="show-password">
-                                        <span class="label-text ml-2">显示密码</span>
-                                    </label>
-                                </span>
-                            </label>
+                            <div class="flex justify-between items-center mt-2">
+                                <label class="label cursor-pointer">
+                                    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm" id="show-password">
+                                    <span class="label-text ml-2">显示密码</span>
+                                </label>
+                                <label class="label cursor-pointer">
+                                    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm" id="remember-wifi">
+                                    <span class="label-text ml-2">记住 WiFi 信息</span>
+                                </label>
+                            </div>
                         </div>
 
                         <!-- WiFi 配置操作按钮 -->
@@ -192,6 +214,109 @@
                                 </svg>
                                 下载配置后的固件
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ESP32 烧录卡片 -->
+                <div class="card bg-base-100 shadow-xl border" id="flash-card" style="display: none;">
+                    <div class="card-body">
+                        <h2 class="card-title">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path>
+                            </svg>
+                            ESP32 设备烧录
+                        </h2>
+
+                        <!-- 浏览器兼容性检查 -->
+                        <div class="alert alert-error" id="browser-unsupported" style="display: none;">
+                            <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div>
+                                <div class="font-bold">浏览器不支持</div>
+                                <div class="text-sm">请使用 Chrome 89+ 或 Edge 89+ 浏览器进行烧录</div>
+                            </div>
+                        </div>
+
+                        <!-- 设备连接区域 -->
+                        <div class="space-y-4" id="device-connection">
+                            <div class="alert alert-info">
+                                <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                </svg>
+                                <div>
+                                    <div class="font-bold">连接 ESP32 设备</div>
+                                    <div class="text-sm">请确保设备已进入下载模式，然后点击连接按钮</div>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-3">
+                                <button class="btn btn-primary" id="connect-device-btn">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    连接设备
+                                </button>
+                                <button class="btn btn-outline" id="disconnect-device-btn" disabled>
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    断开连接
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 设备信息显示 -->
+                        <div class="mt-4" id="device-info" style="display: none;">
+                            <div class="alert alert-success">
+                                <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                                <div>
+                                    <div class="font-bold">设备已连接</div>
+                                    <div class="text-sm" id="device-details">正在检测设备信息...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 烧录控制区域 -->
+                        <div class="mt-6" id="flash-controls" style="display: none;">
+                            <div class="space-y-4">
+                                <!-- 烧录进度 -->
+                                <div id="flash-progress" style="display: none;">
+                                    <div class="flex justify-between text-sm mb-2">
+                                        <span>烧录进度</span>
+                                        <span id="progress-text">0%</span>
+                                    </div>
+                                    <progress class="progress progress-primary w-full" value="0" max="100" id="progress-bar"></progress>
+                                </div>
+
+                                <!-- 烧录按钮 -->
+                                <div class="flex gap-3">
+                                    <button class="btn btn-success" id="start-flash-btn">
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path>
+                                        </svg>
+                                        开始烧录
+                                    </button>
+                                    <button class="btn btn-warning" id="erase-flash-btn">
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"></path>
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 012 0v6a1 1 0 11-2 0V7zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V7z" clip-rule="evenodd"></path>
+                                        </svg>
+                                        擦除闪存
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 烧录日志 -->
+                        <div class="mt-6" id="flash-log-container" style="display: none;">
+                            <h3 class="font-semibold mb-2">烧录日志</h3>
+                            <div class="mockup-code text-xs max-h-48 overflow-y-auto" id="flash-log">
+                                <pre><code id="log-content">等待开始烧录...</code></pre>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -327,6 +452,6 @@
         </div>
     </dialog>
 
-    <script src="config-tool.js"></script>
+    <script type="module" src="config-tool.js"></script>
 </body>
 </html>
