@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="caramellatte">
+<html lang="zh-CN" data-theme="caramellatte">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Power Desk Firmware Configuration Tool</title>
-    <!-- Style files -->
+    <title>Power Desk 固件配置工具</title>
+    <!-- 样式文件 -->
     <link rel="stylesheet" href="/src/style.css">
-    <!-- ESP32 flashing functionality -->
+    <!-- ESP32 烧录功能 -->
     <script>
-        // Provide atob/btoa polyfill
+        // 提供 atob/btoa polyfill
         if (typeof global === 'undefined') {
             window.global = window;
         }
@@ -23,16 +23,16 @@
             };
         }
     </script>
-    <!-- Production environment scripts -->
+    <!-- 生产环境脚本 -->
     <script type="module" src="/src/main.js"></script>
-    <!-- Language switching functionality -->
+    <!-- 语言切换功能 -->
     <script src="/src/lang-switch.js"></script>
 </head>
 <body class="min-h-screen bg-base-100">
-    <!-- Navigation bar -->
+    <!-- 导航栏 -->
     <div class="navbar bg-primary text-primary-content shadow-lg">
         <div class="navbar-start">
-            <h1 class="text-xl font-bold">🔌 Power Desk Firmware Configuration Tool</h1>
+            <h1 class="text-xl font-bold">🔌 Power Desk 固件配置工具</h1>
         </div>
         <div class="navbar-end">
             <div class="dropdown dropdown-end">
@@ -42,64 +42,64 @@
                     </svg>
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 text-base-content rounded-box z-[1] w-52 p-2 shadow">
-                    <li><a onclick="setAutoTheme()">🔄 Auto Switch</a></li>
-                    <li><a onclick="setTheme('caramellatte')">☕ Light Theme</a></li>
-                    <li><a onclick="setTheme('sunset')">🌅 Dark Theme</a></li>
+                    <li><a onclick="setAutoTheme()">🔄 自动切换</a></li>
+                    <li><a onclick="setTheme('caramellatte')">☕ 亮色主题</a></li>
+                    <li><a onclick="setTheme('sunset')">🌅 暗色主题</a></li>
                 </ul>
             </div>
         </div>
     </div>
 
     <div class="container mx-auto p-6 max-w-6xl">
-        <!-- Step indicator -->
+        <!-- 步骤指示器 -->
         <div class="steps steps-horizontal w-full mb-8">
-            <div class="step step-primary" id="step-1">Select Version</div>
-            <div class="step" id="step-2">Configure Parameters</div>
-            <div class="step" id="step-3">Process Firmware</div>
-            <div class="step" id="step-4">Download Firmware</div>
-            <div class="step" id="step-5">Flash Device</div>
+            <div class="step step-primary" id="step-1">选择版本</div>
+            <div class="step" id="step-2">配置参数</div>
+            <div class="step" id="step-3">处理固件</div>
+            <div class="step" id="step-4">下载固件</div>
+            <div class="step" id="step-5">烧录设备</div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left side: Configuration area -->
+            <!-- 左侧：配置区域 -->
             <div class="lg:col-span-2 space-y-6">
-                <!-- Version selection card -->
+                <!-- 版本选择卡片 -->
                 <div class="card bg-base-100 shadow-xl border">
                     <div class="card-body">
                         <h2 class="card-title">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
                             </svg>
-                            Firmware Version Selection
+                            固件版本选择
                         </h2>
                         <div class="form-control">
                             <label class="label">
-                                <span class="label-text">Select Version Type</span>
+                                <span class="label-text">选择版本类型</span>
                             </label>
                             <div class="tabs tabs-boxed">
-                                <a class="tab tab-active" onclick="switchVersionType('release')">Release Version</a>
-                                <a class="tab" onclick="switchVersionType('branch')">Development Branch</a>
-                                <a class="tab" onclick="switchVersionType('local')">Local File</a>
+                                <a class="tab tab-active" onclick="switchVersionType('release')">Release 版本</a>
+                                <a class="tab" onclick="switchVersionType('branch')">开发分支</a>
+                                <a class="tab" onclick="switchVersionType('local')">本地文件</a>
                             </div>
                         </div>
-                        <!-- Online version selection -->
+                        <!-- 在线版本选择 -->
                         <div class="form-control mt-4" id="online-version-selector">
                             <label class="label">
-                                <span class="label-text">Select Specific Version</span>
+                                <span class="label-text">选择具体版本</span>
                             </label>
                             <select class="select select-bordered" id="version-select">
-                                <option disabled selected>Loading version information...</option>
+                                <option disabled selected>正在加载版本信息...</option>
                             </select>
                         </div>
 
-                        <!-- Local file upload -->
+                        <!-- 本地文件上传 -->
                         <div class="form-control mt-4 hidden" id="local-file-selector">
                             <label class="label">
-                                <span class="label-text font-medium">Select Local Firmware File</span>
+                                <span class="label-text font-medium">选择本地固件文件</span>
                             </label>
                             <input type="file" class="file-input file-input-bordered file-input-primary w-full" id="firmware-file-input" accept=".bin,.hex,.elf">
                             <div class="label">
-                                <span class="label-text-alt text-base-content/70">Supports .bin, .hex, .elf format firmware files</span>
+                                <span class="label-text-alt text-base-content/70">支持 .bin、.hex、.elf 格式的固件文件</span>
                             </div>
                         </div>
 
@@ -107,147 +107,149 @@
                             <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
                             </svg>
-                            <span>After selecting a version, the corresponding pre-compiled firmware will be automatically downloaded (✅ indicates pre-compiled firmware is available)</span>
+                            <span>选择版本后将自动下载对应的预编译固件（✅ 表示有预编译固件可用）</span>
                         </div>
 
                         <div class="alert alert-warning mt-4 hidden" id="local-file-info">
                             <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                             </svg>
-                            <span>Please select a firmware file containing the Power Desk project. The tool will automatically detect and read the WiFi configuration structure within it.</span>
+                            <span>请选择包含 Power Desk 项目的固件文件。工具会自动检测并读取其中的 WiFi 配置结构。</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- WiFi configuration card -->
+                <!-- WiFi 配置卡片 -->
                 <div class="card bg-base-100 shadow-xl border">
                     <div class="card-body">
                         <h2 class="card-title">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M17.778 8.222c-4.296-4.296-11.26-4.296-15.556 0A1 1 0 01.808 6.808c5.076-5.077 13.308-5.077 18.384 0a1 1 0 01-1.414 1.414zM14.95 11.05a7 7 0 00-9.9 0 1 1 0 01-1.414-1.414 9 9 0 0112.728 0 1 1 0 01-1.414 1.414zM12.12 13.88a3 3 0 00-4.242 0 1 1 0 01-1.415-1.415 5 5 0 017.072 0 1 1 0 01-1.415 1.415zM9 16a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clip-rule="evenodd"></path>
                             </svg>
-                            WiFi Configuration
+                            WiFi 配置
                         </h2>
                         <div class="form-control">
                             <label class="label">
-                                <span class="label-text font-medium">WiFi Name (SSID)</span>
+                                <span class="label-text font-medium">WiFi 名称 (SSID)</span>
                                 <span class="label-text-alt" id="ssid-counter">0/32</span>
                             </label>
-                            <input type="text" placeholder="Enter WiFi name" class="input input-bordered input-primary w-full" id="wifi-ssid" maxlength="32">
+                            <input type="text" placeholder="输入 WiFi 名称" class="input input-bordered input-primary w-full" id="wifi-ssid" maxlength="32">
                         </div>
                         <div class="form-control mt-4">
                             <label class="label">
-                                <span class="label-text font-medium">WiFi Password</span>
+                                <span class="label-text font-medium">WiFi 密码</span>
                                 <span class="label-text-alt" id="password-counter">0/64</span>
                             </label>
-                            <input type="password" placeholder="Enter WiFi password" class="input input-bordered input-primary w-full" id="wifi-password" maxlength="64">
+                            <input type="password" placeholder="输入 WiFi 密码" class="input input-bordered input-primary w-full" id="wifi-password" maxlength="64">
                             <div class="flex justify-between items-center mt-2">
                                 <label class="label cursor-pointer">
                                     <input type="checkbox" class="checkbox checkbox-primary checkbox-sm" id="show-password">
-                                    <span class="label-text ml-2">Show Password</span>
+                                    <span class="label-text ml-2">显示密码</span>
                                 </label>
                                 <label class="label cursor-pointer">
                                     <input type="checkbox" class="checkbox checkbox-primary checkbox-sm" id="remember-wifi">
-                                    <span class="label-text ml-2">Remember WiFi Info</span>
+                                    <span class="label-text ml-2">记住 WiFi 信息</span>
                                 </label>
                             </div>
                         </div>
 
-                        <!-- WiFi configuration action buttons -->
+                        <!-- WiFi 配置操作按钮 -->
                         <div class="card-actions justify-end mt-6">
                             <button class="btn btn-outline" id="read-config-btn" disabled>
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
                                     <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path>
                                 </svg>
-                                Read Current Config
+                                读取当前配置
                             </button>
                             <button class="btn btn-primary" id="apply-config-btn" disabled>
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
                                 </svg>
-                                Apply Configuration
+                                应用配置
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Firmware processing card -->
+                <!-- 固件处理卡片 -->
                 <div class="card bg-base-100 shadow-xl border">
                     <div class="card-body">
                         <h2 class="card-title">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                             </svg>
-                            Firmware Processing
+                            固件处理
                         </h2>
-
-                        <!-- Firmware status display -->
+                        
+                        <!-- 固件状态显示 -->
                         <div class="alert alert-warning" id="no-firmware-alert">
                             <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                             </svg>
                             <div>
-                                <div class="font-bold">Please select firmware version first</div>
-                                <div class="text-sm">The corresponding pre-compiled firmware will be automatically downloaded after version selection</div>
+                                <div class="font-bold">请先选择固件版本</div>
+                                <div class="text-sm">选择版本后将自动下载对应的预编译固件</div>
                             </div>
                         </div>
 
-                        <!-- Firmware information display -->
+
+
+                        <!-- 固件信息显示 -->
                         <div class="mt-6" id="firmware-info" style="display: none;">
                             <div class="alert alert-success shadow-sm">
                                 <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                                 </svg>
                                 <div class="flex-1">
-                                    <div class="font-semibold text-base">Firmware Loaded</div>
+                                    <div class="font-semibold text-base">固件已加载</div>
                                     <div class="text-sm opacity-80 mt-1" id="firmware-details"></div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Download button -->
+                        <!-- 下载按钮 -->
                         <div class="card-actions justify-center mt-6">
                             <button class="btn btn-success btn-wide" id="download-btn" disabled>
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                                 </svg>
-                                Download Configured Firmware
+                                下载配置后的固件
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- ESP32 flashing card -->
+                <!-- ESP32 烧录卡片 -->
                 <div class="card bg-base-100 shadow-xl border" id="flash-card" style="display: none;">
                     <div class="card-body">
                         <h2 class="card-title">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path>
                             </svg>
-                            ESP32 Device Flashing
+                            ESP32 设备烧录
                         </h2>
 
-                        <!-- Browser compatibility check -->
+                        <!-- 浏览器兼容性检查 -->
                         <div class="alert alert-error" id="browser-unsupported" style="display: none;">
                             <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                             </svg>
                             <div>
-                                <div class="font-bold">Browser Not Supported</div>
-                                <div class="text-sm">Please use Chrome 89+ or Edge 89+ browser for flashing</div>
+                                <div class="font-bold">浏览器不支持</div>
+                                <div class="text-sm">请使用 Chrome 89+ 或 Edge 89+ 浏览器进行烧录</div>
                             </div>
                         </div>
 
-                        <!-- Device connection area -->
+                        <!-- 设备连接区域 -->
                         <div class="space-y-4" id="device-connection">
                             <div class="alert alert-info">
                                 <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
                                 </svg>
                                 <div>
-                                    <div class="font-bold">Connect ESP32 Device</div>
-                                    <div class="text-sm">Please ensure the device is in download mode, then click the connect button</div>
+                                    <div class="font-bold">连接 ESP32 设备</div>
+                                    <div class="text-sm">请确保设备已进入下载模式，然后点击连接按钮</div>
                                 </div>
                             </div>
 
@@ -256,101 +258,101 @@
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"></path>
                                     </svg>
-                                    Connect Device
+                                    连接设备
                                 </button>
                                 <button class="btn btn-outline" id="disconnect-device-btn" disabled>
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                                     </svg>
-                                    Disconnect
+                                    断开连接
                                 </button>
                             </div>
                         </div>
 
-                        <!-- Device information display -->
+                        <!-- 设备信息显示 -->
                         <div class="mt-4" id="device-info" style="display: none;">
                             <div class="alert alert-success">
                                 <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                                 </svg>
                                 <div>
-                                    <div class="font-bold">Device Connected</div>
-                                    <div class="text-sm" id="device-details">Detecting device information...</div>
+                                    <div class="font-bold">设备已连接</div>
+                                    <div class="text-sm" id="device-details">正在检测设备信息...</div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Flashing control area -->
+                        <!-- 烧录控制区域 -->
                         <div class="mt-6" id="flash-controls" style="display: none;">
                             <div class="space-y-4">
-                                <!-- Flashing progress -->
+                                <!-- 烧录进度 -->
                                 <div id="flash-progress" style="display: none;">
                                     <div class="flex justify-between text-sm mb-2">
-                                        <span>Flashing Progress</span>
+                                        <span>烧录进度</span>
                                         <span id="progress-text">0%</span>
                                     </div>
                                     <progress class="progress progress-primary w-full" value="0" max="100" id="progress-bar"></progress>
                                 </div>
 
-                                <!-- Flashing buttons -->
+                                <!-- 烧录按钮 -->
                                 <div class="flex gap-3">
                                     <button class="btn btn-success" id="start-flash-btn">
                                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                             <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path>
                                         </svg>
-                                        Start Flashing
+                                        开始烧录
                                     </button>
                                     <button class="btn btn-warning" id="erase-flash-btn">
                                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                             <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"></path>
                                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 012 0v6a1 1 0 11-2 0V7zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V7z" clip-rule="evenodd"></path>
                                         </svg>
-                                        Erase Flash
+                                        擦除闪存
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Flashing log -->
+                        <!-- 烧录日志 -->
                         <div class="mt-6" id="flash-log-container" style="display: none;">
-                            <h3 class="font-semibold mb-2">Flashing Log</h3>
+                            <h3 class="font-semibold mb-2">烧录日志</h3>
                             <div class="mockup-code text-xs max-h-48 overflow-y-auto" id="flash-log">
-                                <pre><code id="log-content">Waiting to start flashing...</code></pre>
+                                <pre><code id="log-content">等待开始烧录...</code></pre>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Right side: Documentation -->
+            <!-- 右侧：说明文档 -->
             <div class="space-y-6">
-                <!-- Hardware connection instructions card -->
+                <!-- 烧录说明卡片 -->
                 <div class="card bg-base-100 shadow-xl border">
                     <div class="card-body">
                         <h2 class="card-title text-warning">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                             </svg>
-                            Hardware Connection Instructions
+                            硬件连接说明
                         </h2>
                         <div class="prose prose-sm max-w-none">
-                            <p class="text-sm">Before flashing firmware, please follow these steps to connect hardware:</p>
+                            <p class="text-sm">烧录固件前，请按以下步骤连接硬件：</p>
                             <ol class="text-sm space-y-1">
-                                <li><strong>Disconnect all power sources</strong></li>
-                                <li><strong>Connect DC power supply</strong> (5V-12V)</li>
-                                <li><strong>Connect USB data cable:</strong>
+                                <li><strong>断开所有电源</strong></li>
+                                <li><strong>连接 DC 供电</strong>（5V-12V）</li>
+                                <li><strong>连接 USB 数据线：</strong>
                                     <ul class="ml-4 mt-1">
                                         <li>D+ → USB D+</li>
                                         <li>D- → USB D-</li>
                                         <li>GND → USB GND</li>
-                                        <li>⚠️ Note: No VBUS pin on hardware</li>
+                                        <li>⚠️ 注意：硬件上没有 VBUS 引脚</li>
                                     </ul>
                                 </li>
-                                <li><strong>Enter download mode:</strong>
+                                <li><strong>进入下载模式：</strong>
                                     <ul class="ml-4 mt-1">
-                                        <li>Hold BOOT button</li>
-                                        <li>Press RESET button briefly</li>
-                                        <li>Release BOOT button</li>
+                                        <li>按住 BOOT 按钮</li>
+                                        <li>短按 RESET 按钮</li>
+                                        <li>松开 BOOT 按钮</li>
                                     </ul>
                                 </li>
                             </ol>
@@ -358,33 +360,33 @@
                     </div>
                 </div>
 
-                <!-- Flashing commands card -->
+                <!-- 烧录命令卡片 -->
                 <div class="card bg-base-100 shadow-xl border">
                     <div class="card-body">
                         <h2 class="card-title text-info">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
                             </svg>
-                            Flashing Commands
+                            烧录命令
                         </h2>
                         <div class="space-y-3">
                             <div>
-                                <p class="text-sm font-medium mb-2">1. Install espflash (if not installed):</p>
+                                <p class="text-sm font-medium mb-2">1. 安装 espflash（如果未安装）：</p>
                                 <div class="mockup-code text-xs">
                                     <pre><code>cargo install espflash</code></pre>
                                 </div>
                             </div>
                             <div>
-                                <p class="text-sm font-medium mb-2">2. Flash firmware:</p>
+                                <p class="text-sm font-medium mb-2">2. 烧录固件：</p>
                                 <div class="mockup-code text-xs">
                                     <pre><code>espflash flash power-desk-configured.bin --monitor</code></pre>
                                 </div>
                                 <button class="btn btn-xs btn-outline mt-2" onclick="copyToClipboard('espflash flash power-desk-configured.bin --monitor')">
-                                    Copy Command
+                                    复制命令
                                 </button>
                             </div>
                             <div>
-                                <p class="text-sm font-medium mb-2">3. Specify port (optional):</p>
+                                <p class="text-sm font-medium mb-2">3. 指定端口（可选）：</p>
                                 <div class="mockup-code text-xs">
                                     <pre><code>espflash flash power-desk-configured.bin --port /dev/ttyUSB0 --monitor</code></pre>
                                 </div>
@@ -393,46 +395,46 @@
                     </div>
                 </div>
 
-                <!-- Troubleshooting card -->
+                <!-- 故障排除卡片 -->
                 <div class="card bg-base-100 shadow-xl border">
                     <div class="card-body">
                         <h2 class="card-title text-error">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                             </svg>
-                            Troubleshooting
+                            故障排除
                         </h2>
                         <div class="collapse collapse-arrow">
                             <input type="checkbox">
                             <div class="collapse-title text-sm font-medium">
-                                Device Not Recognized
+                                设备未识别
                             </div>
                             <div class="collapse-content text-xs">
-                                <p>• Check if USB cable is working properly</p>
-                                <p>• Confirm device is in download mode</p>
-                                <p>• Try different USB ports</p>
+                                <p>• 检查 USB 连接线是否正常</p>
+                                <p>• 确认设备已进入下载模式</p>
+                                <p>• 尝试不同的 USB 端口</p>
                             </div>
                         </div>
                         <div class="collapse collapse-arrow">
                             <input type="checkbox">
                             <div class="collapse-title text-sm font-medium">
-                                Flashing Failed
+                                烧录失败
                             </div>
                             <div class="collapse-content text-xs">
-                                <p>• Confirm firmware file is complete</p>
-                                <p>• Check if power supply is stable</p>
-                                <p>• Re-enter download mode</p>
+                                <p>• 确认固件文件完整</p>
+                                <p>• 检查供电是否稳定</p>
+                                <p>• 重新进入下载模式</p>
                             </div>
                         </div>
                         <div class="collapse collapse-arrow">
                             <input type="checkbox">
                             <div class="collapse-title text-sm font-medium">
-                                WiFi Connection Issues
+                                WiFi 连接问题
                             </div>
                             <div class="collapse-content text-xs">
-                                <p>• Check if SSID and password are correct</p>
-                                <p>• Confirm WiFi signal strength</p>
-                                <p>• Reconfigure and flash firmware</p>
+                                <p>• 检查 SSID 和密码是否正确</p>
+                                <p>• 确认 WiFi 信号强度</p>
+                                <p>• 重新配置并烧录固件</p>
                             </div>
                         </div>
                     </div>
@@ -441,13 +443,13 @@
         </div>
     </div>
 
-    <!-- Loading modal -->
+    <!-- 加载中模态框 -->
     <dialog id="loading-modal" class="modal">
         <div class="modal-box">
-            <h3 class="font-bold text-lg">Processing...</h3>
+            <h3 class="font-bold text-lg">处理中...</h3>
             <div class="flex items-center space-x-4 mt-4">
                 <span class="loading loading-spinner loading-md"></span>
-                <span id="loading-text">Processing firmware, please wait...</span>
+                <span id="loading-text">正在处理固件，请稍候...</span>
             </div>
         </div>
     </dialog>
